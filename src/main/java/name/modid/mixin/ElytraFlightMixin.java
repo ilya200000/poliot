@@ -1,6 +1,5 @@
 package name.modid.mixin;
 
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,38 +13,36 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-
-        // Самая жесткая защита от крашей (проверка всего)
         if (player == null || player.networkHandler == null) return;
 
+        // 1. АВТО-ВЗЛЕТ (Bypass для Grim)
+        if (!player.isOnGround() && player.getVelocity().y < -0.05) {
+            // Заставляем игру думать, что мы только что раскрыли элитры
+            player.checkFallFlying();
+        }
+
         if (player.isFallFlying()) {
-            MinecraftClient client = MinecraftClient.getInstance();
             Vec3d look = player.getRotationVec(1.0F);
             
-            // СКОРОСТЬ ДЛЯ REALLYWORLD: 0.13 — это край. 
-            // Если будет флажить (откидывать), снизь до 0.1.
-            double speed = 0.8;
+            // СКОРОСТЬ: 0.11 - это предел для Mystery/RW
+            double s = 0.11;
 
-            // 1. ДВИЖЕНИЕ (Только если жмешь W)
-            if (client.options.forwardKey.isPressed()) {
-                // Вместо addVelocity, ставим жесткий вектор, но МЯГКИЙ
-                Vec3d currentVel = player.getVelocity();
-                player.setVelocity(look.x * speed, currentVel.y, look.z * speed);
+            // 2. ДВИЖЕНИЕ (Имитируем планирование)
+            // Мы не ставим скорость жестко, а "подруливаем" ванильную инерцию
+            Vec3d v = player.getVelocity();
+            player.setVelocity(
+                v.x + look.x * s * 0.2, 
+                -0.01, // Жестко фиксируем микро-падение для сервера
+                v.z + look.z * s * 0.2
+            );
+
+            // 3. ОБХОД КИКА (Packet Reset)
+            // Каждые 5 тиков мы "сбрасываем" позицию на миллиметр, чтобы античит тупил
+            if (player.age % 5 == 0) {
+                player.addVelocity(0, 0.02, 0);
             }
 
-            // 2. BYPASS GRIM (Вертикальный обход)
-            // Самое важное: сервер RW кикает, если ты не падаешь.
-            // Мы делаем "ступеньку": 3 тика висим, 1 тик падаем.
-            if (player.age % 4 == 0) {
-                player.addVelocity(0, -0.05, 0); // Имитация падения
-            } else {
-                // Удерживаем высоту микро-импульсом
-                Vec3d v = player.getVelocity();
-                player.setVelocity(v.x, 0.01, v.z);
-            }
-
-            // 3. NO-FALL (Чтобы не сдохнуть при лаге)
-            player.onLanding();
+            player.onLanding(); // Защита от смерти
         }
     }
 }
