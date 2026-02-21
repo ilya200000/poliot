@@ -15,41 +15,37 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Безопасная проверка: игрок должен быть в мире
         if (player != null && player.isFallFlying()) {
-            
-            // Используем MinecraftClient напрямую (самый стабильный способ в 1.21)
             MinecraftClient client = MinecraftClient.getInstance();
-            boolean isForward = client.options.forwardKey.isPressed();
-            boolean isJump = client.options.jumpKey.isPressed();
-
-            Vec3d look = player.getRotationVec(1.0F);
             
-            // СКОРОСТЬ 0.16 — золотая середина для Mystery/BedWars
-            double speed = 0.16; 
+            // Если зажата кнопка Вперед (W)
+            if (client.options.forwardKey.isPressed()) {
+                Vec3d look = player.getRotationVec(1.0F);
+                
+                // СКОРОСТЬ: 0.15 — идеальный баланс для MysteryWorld. 
+                // Выше 0.2 будет кикать "Speed (A)".
+                double s = 0.15;
 
-            if (isForward) {
-                // Толкаем игрока вперед
-                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
+                // Вместо addVelocity используем мягкий импульс
+                Vec3d velocity = player.getVelocity();
+                player.setVelocity(
+                    velocity.x + look.x * s + (look.x * 1.0 - velocity.x) * 0.1,
+                    velocity.y + look.y * s + (look.y * 1.0 - velocity.y) * 0.1,
+                    velocity.z + look.z * s + (look.z * 1.0 - velocity.z) * 0.1
+                );
             }
 
-            // ANTI-GRAVITY: Не даем падать камнем вниз
-            Vec3d v = player.getVelocity();
-            if (v.y < -0.01) {
-                // Плавное удержание высоты
-                player.setVelocity(v.x, -0.01, v.z);
+            // ANTI-KICK: Имитируем небольшое падение каждые 5 тиков
+            if (player.age % 5 == 0) {
+                player.addVelocity(0, -0.02, 0);
             }
 
-            // Набор высоты на Пробел (имитация восходящего потока)
-            if (isJump) {
-                player.addVelocity(0, 0.08, 0);
-            }
-
-            // Сброс урона от падения
+            // Сброс дистанции падения, чтобы не разбиться
             player.onLanding();
         }
     }
 }
+
 
 
 
