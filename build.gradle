@@ -11,7 +11,7 @@ repositories {
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:1.21.1"
+    minecraft "com.mojang:minecraft:1.21.11"
     // Используем Yarn вместо Mojang - это должно решить проблему
     mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
     modImplementation "net.fabricmc:fabric-loader:0.16.7"
