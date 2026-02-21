@@ -11,15 +11,13 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity) (Object) this;
-        // Проверяем мир и сторону (клиент)
-        if (player.getWorld() != null && player.getWorld().isClient) {
-            if (player.isFallFlying()) {
-                player.getAbilities().flying = true;
-                player.getAbilities().setFlySpeed(0.05f);
-            }
+        if (player.isFallFlying()) {
+            player.getAbilities().flying = true;
+            player.getAbilities().setFlySpeed(0.05f);
         }
     }
 }
+
 
 
 
