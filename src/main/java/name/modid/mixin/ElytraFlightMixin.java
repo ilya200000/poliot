@@ -2,6 +2,7 @@ package name.modid.mixin;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,38 +15,40 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
+        if (player == null || player.networkHandler == null) return;
 
-        if (player != null && player.isFallFlying()) {
+        // 1. АВТО-ВЗЛЕТ (Bypass для Mystery)
+        // Если мы падаем, мод сам шлет пакет серверу "я раскрыл элитры"
+        if (!player.isOnGround() && !player.isFallFlying() && player.getVelocity().y < -0.1) {
+            player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+        }
+
+        // 2. УМНЫЙ ПОЛЕТ
+        if (player.isFallFlying()) {
             MinecraftClient client = MinecraftClient.getInstance();
+            Vec3d look = player.getRotationVec(1.0F);
             
-            // Если зажата кнопка Вперед (W)
+            // СКОРОСТЬ: 0.08 - это очень мало, но это НЕ ПАЛИТСЯ.
+            // Ты будешь лететь вечно и не падать.
+            double s = 0.08; 
+
             if (client.options.forwardKey.isPressed()) {
-                Vec3d look = player.getRotationVec(1.0F);
-                
-                // СКОРОСТЬ: 0.15 — идеальный баланс для MysteryWorld. 
-                // Выше 0.2 будет кикать "Speed (A)".
-                double s = 0.15;
-
-                // Вместо addVelocity используем мягкий импульс
-                Vec3d velocity = player.getVelocity();
-                player.setVelocity(
-                    velocity.x + look.x * s + (look.x * 1.0 - velocity.x) * 0.1,
-                    velocity.y + look.y * s + (look.y * 1.0 - velocity.y) * 0.1,
-                    velocity.z + look.z * s + (look.z * 1.0 - velocity.z) * 0.1
-                );
+                // Вместо жесткой установки скорости, мы плавно "подруливаем"
+                Vec3d v = player.getVelocity();
+                player.setVelocity(v.x + look.x * s, v.y + look.y * s + 0.05, v.z + look.z * s);
             }
 
-            // ANTI-KICK: Имитируем небольшое падение каждые 5 тиков
-            if (player.age % 5 == 0) {
-                player.addVelocity(0, -0.02, 0);
+            // 3. ОБМАН ГРАВИТАЦИИ (Anti-Kick)
+            // Каждые 2 тика мы имитируем падение, чтобы сервер не считал это Fly
+            Vec3d vel = player.getVelocity();
+            if (player.age % 2 == 0) {
+                player.setVelocity(vel.x, -0.01, vel.z);
             }
 
-            // Сброс дистанции падения, чтобы не разбиться
-            player.onLanding();
+            player.onLanding(); // Сброс урона
         }
     }
 }
-
 
 
 
