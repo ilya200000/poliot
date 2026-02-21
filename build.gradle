@@ -10,6 +10,9 @@ repositories {
     maven { url = "https://maven.fabricmc.net" }
     maven { url = "https://maven.architectury.dev" }
     maven { url = "https://maven.terraformersmc.com" }
+    // ДОБАВИЛИ ЭТОТ РЕПОЗИТОРИЙ ДЛЯ MIXINEXTRAS:
+    maven { url = "https://jitpack.io" }
+    maven { url = "https://maven.llamalad7.com" }
 }
 
 dependencies {
@@ -18,16 +21,21 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:0.16.7"
     modImplementation "net.fabricmc.fabric-api:fabric-api:0.106.0+1.21.1"
 
-    // Architectury API - для стабильной работы с кнопками и игроком
+    // Architectury API
     modImplementation "dev.architectury:architectury-fabric:13.0.6"
 
-    // MixinExtras - чтобы античит не видел грубых инъекций кода
-    include(implementation("com.llamalad7:mixinextras-fabric:0.4.1"))
-    annotationProcessor "com.llamalad7:mixinextras-fabric:0.4.1"
+    // MixinExtras (исправленный путь)
+    include(implementation("com.github.LlamaLad7:MixinExtras:0.4.1"))
+    annotationProcessor "com.github.LlamaLad7:MixinExtras:0.4.1"
 }
 
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 java {
