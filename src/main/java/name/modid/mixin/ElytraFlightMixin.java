@@ -9,29 +9,33 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(PlayerEntity.class)
 public abstract class ElytraFlightMixin {
+    
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity) (Object) this;
 
-        if (player.getWorld().isClient && player.isFallFlying()) {
-            // 1. Убираем стандартное замедление (парение)
-            player.getAbilities().flying = true;
+        // 1. Проверяем, что мы на клиенте и игрок существует в мире
+        if (player.getWorld() != null && player.getWorld().isClient) {
+            
+            // 2. Работает только при активном полете на элитрах
+            if (player.isFallFlying()) {
+                
+                // Направление взгляда
+                Vec3d look = player.getRotationVec(1.0F);
+                double speed = 0.5; // Скорость (0.5 - быстро, 0.2 - безопасно для серверов)
 
-            // 2. Движение ВПЕРЕД (куда смотришь)
-            // Берем вектор взгляда
-            Vec3d look = player.getRotationVec(1.0F);
-            double speed = 0.35; // Скорость полета (0.35 - оптимально для серверов)
-
-            // Применяем скорость только если нажаты кнопки движения
-            if (player.forwardSpeed > 0) {
-                player.setVelocity(look.x * speed, look.y * speed, look.z * speed);
-            }
-
-            // 3. ANTI-KICK (Микро-падение)
-            // Чтобы сервер не кикал за полет, мы заставляем персонажа чуть-чуть 
-            // опускаться вниз каждые несколько тиков (имитация падения)
-            if (player.age % 20 == 0) {
-                player.addVelocity(0, -0.01, 0);
+                // 3. ЛЕТИМ вперед (только если нажата кнопка движения W)
+                // Используем проверку горизонтальной скорости для стабильности
+                if (player.forwardSpeed > 0) {
+                    player.setVelocity(look.x * speed, look.y * speed, look.z * speed);
+                } else {
+                    // Простое зависание/планирование без падения вниз
+                    Vec3d currentVel = player.getVelocity();
+                    player.setVelocity(currentVel.x, -0.005, currentVel.z);
+                }
+                
+                // Убираем урон от падения
+                player.onLanding();
             }
         }
     }
