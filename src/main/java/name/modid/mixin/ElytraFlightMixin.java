@@ -14,34 +14,39 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        if (player != null && player.isFallFlying()) {
+        if (player == null || player.networkHandler == null) return;
+
+        if (player.isFallFlying()) {
             MinecraftClient client = MinecraftClient.getInstance();
             
-            // Если зажата W
+            // Проверка нажатия W (через стабильный метод)
             if (client.options.forwardKey.isPressed()) {
                 Vec3d look = player.getRotationVec(1.0F);
-                double speed = 0.15; // Безопасный порог для Mystery
+                
+                // СКОРОСТЬ: 0.12 — "Золотая середина" для 1.21.11 на серверах
+                double speed = 0.12; 
 
-                // Вместо Velocity меняем позицию пакетами (Bypass)
                 double nextX = player.getX() + look.x * speed;
-                double nextY = player.getY() + look.y * speed;
+                double nextY = player.getY() + (look.y * speed);
                 double nextZ = player.getZ() + look.z * speed;
 
-                // Шлем серверу пакет: "я здесь, и я на земле" (обман гравитации)
+                // Шлем пакет с 4 аргументами (X, Y, Z, onGround)
+                // Ставим false, чтобы сервер понимал, что мы в воздухе, но летим легально
                 if (player.age % 2 == 0) {
-                    player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(nextX, nextY, nextZ, true, player.horizontalCollision));
+                    player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(nextX, nextY, nextZ, false));
                     player.setPosition(nextX, nextY, nextZ);
                 }
             }
 
-            // Фикс падения: медленное снижение, чтобы античит не кикнул за Fly
+            // ANTI-KICK: Микро-движение вниз, имитирующее планирование
             Vec3d v = player.getVelocity();
-            player.setVelocity(v.x, -0.01, v.z);
+            player.setVelocity(v.x, -0.008, v.z);
             
-            player.onLanding();
+            player.onLanding(); // Сброс урона от падения
         }
     }
 }
+
 
 
 
