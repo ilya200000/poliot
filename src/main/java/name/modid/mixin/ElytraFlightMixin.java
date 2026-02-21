@@ -1,5 +1,6 @@
 package name.modid.mixin;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,26 +15,30 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Проверяем, что игрок реально летит на элитрах
+        // Проверяем полет на элитрах
         if (player.isFallFlying()) {
-            // Направление взгляда
-            Vec3d look = player.getRotationVec(1.0F);
-            
-            // Скорость (0.25 - золотая середина)
-            double speed = 0.25;
+            // Получаем доступ к кнопкам напрямую через движок, а не через игрока
+            boolean isForwardPressed = MinecraftClient.getInstance().options.forwardKey.isPressed();
+            boolean isJumpPressed = MinecraftClient.getInstance().options.jumpKey.isPressed();
 
-            // Если игрок нажимает клавиши движения (любые)
-            // Мы проверяем это через стандартный метод, который не крашит
-            if (player.input.movementForward > 0) {
-                // Плавное ускорение вперед
+            Vec3d look = player.getRotationVec(1.0F);
+            double speed = 0.3; // Твоя скорость полета
+
+            if (isForwardPressed) {
+                // Двигаем игрока вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
             } else {
-                // Зависание в воздухе
-                Vec3d velocity = player.getVelocity();
-                player.setVelocity(velocity.x, -0.001, velocity.z);
+                // Стабильное планирование (зависание)
+                Vec3d v = player.getVelocity();
+                player.setVelocity(v.x, -0.005, v.z);
             }
 
-            // Убираем урон от падения
+            // Если жмешь прыжок - летишь выше
+            if (isJumpPressed) {
+                player.addVelocity(0, 0.1, 0);
+            }
+
+            // Сброс урона от падения
             player.fallDistance = 0;
         }
     }
