@@ -15,34 +15,36 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Летаем только если элитры реально активированы
-        if (player.isFallFlying()) {
-            // Прямое обращение к кнопкам через настройки игры (самый стабильный способ)
-            boolean isForwardPressed = MinecraftClient.getInstance().options.forwardKey.isPressed();
-            boolean isJumpPressed = MinecraftClient.getInstance().options.jumpKey.isPressed();
+        // Летаем только если элитры реально раскрыты
+        if (player != null && player.isFallFlying()) {
+            
+            // Читаем нажатие кнопок напрямую из настроек (самый стабильный способ)
+            boolean isForward = MinecraftClient.getInstance().options.forwardKey.isPressed();
+            boolean isJump = MinecraftClient.getInstance().options.jumpKey.isPressed();
 
             Vec3d look = player.getRotationVec(1.0F);
-            double speed = 0.4; // Твоя скорость полета
+            double speed = 0.25; // Оптимально для MysteryWorld (0.1 - 0.3)
 
-            if (isForwardPressed) {
-                // Плавное ускорение вперед по направлению взгляда
+            if (isForward) {
+                // Плавное ускорение вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
             } else {
-                // Если W не нажата — зависаем (медленное планирование)
+                // Режим парения (Anti-Gravity)
                 Vec3d v = player.getVelocity();
                 player.setVelocity(v.x, -0.005, v.z);
             }
 
-            // Набор высоты на пробел
-            if (isJumpPressed) {
-                player.addVelocity(0, 0.15, 0);
+            // Набор высоты на Пробел
+            if (isJump) {
+                player.addVelocity(0, 0.1, 0);
             }
 
-            // Убираем урон при приземлении
+            // Убираем урон при посадке
             player.fallDistance = 0;
         }
     }
 }
+
 
 
 
