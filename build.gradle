@@ -9,33 +9,13 @@ repositories {
     mavenCentral()
     maven { url = "https://maven.fabricmc.net" }
     maven { url = "https://maven.architectury.dev" }
-    maven { url = "https://maven.terraformersmc.com" }
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:1.21.1"
+    minecraft "com.mojang:minecraft:1.21.1" // База 1.21.1 подходит для 1.21.11
     mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
     modImplementation "net.fabricmc:fabric-loader:0.16.7"
     modImplementation "net.fabricmc.fabric-api:fabric-api:0.106.0+1.21.1"
-
-    // Architectury API - оставляем, он качается нормально
     modImplementation "dev.architectury:architectury-fabric:13.0.6"
-    
-    // MixinExtras мы убрали из зависимостей, так как он встроен в Loader.
-    // Это решит проблему с ошибкой "Could not resolve".
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
