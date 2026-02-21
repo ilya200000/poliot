@@ -15,32 +15,27 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Летаем только если элитры реально раскрыты
         if (player != null && player.isFallFlying()) {
-            
-            // Читаем нажатие кнопок напрямую из настроек (самый стабильный способ)
-            boolean isForward = MinecraftClient.getInstance().options.forwardKey.isPressed();
-            boolean isJump = MinecraftClient.getInstance().options.jumpKey.isPressed();
+            // Прямая проверка кнопок через MinecraftClient (самый надежный способ)
+            MinecraftClient client = MinecraftClient.getInstance();
+            boolean isForward = client.options.forwardKey.isPressed();
+            boolean isJump = client.options.jumpKey.isPressed();
 
             Vec3d look = player.getRotationVec(1.0F);
-            double speed = 0.25; // Оптимально для MysteryWorld (0.1 - 0.3)
+            double speed = 0.25;
 
             if (isForward) {
-                // Плавное ускорение вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
             } else {
-                // Режим парения (Anti-Gravity)
                 Vec3d v = player.getVelocity();
                 player.setVelocity(v.x, -0.005, v.z);
             }
 
-            // Набор высоты на Пробел
             if (isJump) {
                 player.addVelocity(0, 0.1, 0);
             }
 
-            // Убираем урон при посадке
-            player.fallDistance = 0;
+            player.setFallDistance(0);
         }
     }
 }
