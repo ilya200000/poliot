@@ -1,4 +1,5 @@
 {
+{
   "required": true,
   "minVersion": "0.8",
   "package": "name.modid.mixin",
@@ -6,7 +7,7 @@
   "mixins": [
   ],
   "client": [
-    "EntityMixin"
+    "ElytraFlightMixin"
   ],
   "injectors": {
     "defaultRequire": 1
