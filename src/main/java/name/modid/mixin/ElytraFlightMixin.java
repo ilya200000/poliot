@@ -1,5 +1,6 @@
 package name.modid.mixin;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,28 +15,31 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Если элитры раскрыты
-        if (player != null && player.isFallFlying()) {
-            // Вектор взгляда
+        // Летаем только если элитры реально активированы
+        if (player.isFallFlying()) {
+            // Прямое обращение к кнопкам через настройки игры (самый стабильный способ)
+            boolean isForwardPressed = MinecraftClient.getInstance().options.forwardKey.isPressed();
+            boolean isJumpPressed = MinecraftClient.getInstance().options.jumpKey.isPressed();
+
             Vec3d look = player.getRotationVec(1.0F);
-            
-            // СКОРОСТЬ: 0.45 — это быстро (как фейерверк). 
-            // Если будет кикать "Fly", снизь до 0.25
-            double speed = 0.45; 
+            double speed = 0.4; // Твоя скорость полета
 
-            // Устанавливаем скорость СТРОГО по направлению взгляда
-            // Это дает тот самый эффект "управляемой ракеты"
-            player.setVelocity(look.x * speed, look.y * speed, look.z * speed);
-
-            // Чтобы сервер не думал, что ты стоишь в воздухе (Anti-Kick)
-            // Мы позволяем игре считать, что ты летишь, обнуляя урон
-            player.fallDistance = 0;
-            
-            // Фикс для приземления: если подлетаешь близко к земле, 
-            // немного замедляемся, чтобы не крашнуло об блоки
-            if (player.isOnGround()) {
-                player.getAbilities().flying = false;
+            if (isForwardPressed) {
+                // Плавное ускорение вперед по направлению взгляда
+                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
+            } else {
+                // Если W не нажата — зависаем (медленное планирование)
+                Vec3d v = player.getVelocity();
+                player.setVelocity(v.x, -0.005, v.z);
             }
+
+            // Набор высоты на пробел
+            if (isJumpPressed) {
+                player.addVelocity(0, 0.15, 0);
+            }
+
+            // Убираем урон при приземлении
+            player.fallDistance = 0;
         }
     }
 }
