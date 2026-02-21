@@ -1,6 +1,5 @@
 package name.modid.mixin;
 
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,36 +14,25 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Проверяем полет на элитрах
+        // Самая простая проверка полета
         if (player.isFallFlying()) {
-            // Получаем доступ к кнопкам напрямую через движок, а не через игрока
-            boolean isForwardPressed = MinecraftClient.getInstance().options.forwardKey.isPressed();
-            boolean isJumpPressed = MinecraftClient.getInstance().options.jumpKey.isPressed();
-
+            // Получаем вектор взгляда (этот метод стабилен)
             Vec3d look = player.getRotationVec(1.0F);
-            double speed = 0.3; // Твоя скорость полета
+            
+            // Даем постоянный небольшой импульс вперед (авто-полет)
+            // 0.15 - медленно, но очень стабильно и не крашит
+            double s = 0.15;
+            player.addVelocity(look.x * s, look.y * s, look.z * s);
 
-            if (isForwardPressed) {
-                // Двигаем игрока вперед
-                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
-            } else {
-                // Стабильное планирование (зависание)
-                Vec3d v = player.getVelocity();
-                player.setVelocity(v.x, -0.005, v.z);
-            }
-
-            // Если жмешь прыжок - летишь выше
-            if (isJumpPressed) {
-                player.addVelocity(0, 0.1, 0);
-            }
-
-            // Сброс урона от падения
-            player.fallDistance = 0;
+            // Фикс гравитации: летим ровно, не падаем
+            Vec3d v = player.getVelocity();
+            player.setVelocity(v.x, v.y + 0.05, v.z);
+            
+            // Сброс урона
+            player.onLanding();
         }
     }
 }
-
-
 
 
 
