@@ -3,7 +3,6 @@
   "id": "poliot",
   "version": "1.0.0",
   "name": "poliot",
-  "description": "Elytra Fly Mod",
   "authors": ["Me!"],
   "license": "CC0-1.0",
   "environment": "*",
@@ -13,8 +12,9 @@
   ],
   "depends": {
     "fabricloader": ">=0.16.0",
-    "minecraft": ">=1.21",
+    "minecraft": ">=1.21.1",
     "java": ">=21"
   }
 }
+
 
