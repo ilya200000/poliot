@@ -4,9 +4,7 @@
   "version": "1.0.0",
   "name": "poliot",
   "description": "Elytra Fly Mod",
-  "authors": [
-    "Me!"
-  ],
+  "authors": ["Me!"],
   "contact": {
     "homepage": "https://fabricmc.net",
     "sources": "https://github.com"
@@ -15,9 +13,6 @@
   "icon": "assets/poliot/icon.png",
   "environment": "*",
   "entrypoints": {
-    "client": [
-      "name.modid.PoliotClient"
-    ]
   },
   "mixins": [
     "poliot.mixins.json"
