@@ -8,14 +8,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Entity.class)
-public class ElytraFlightMixin {
+public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         if ((Object) this instanceof PlayerEntity player) {
+            // Если игрок летит на элитрах
             if (player.isFallFlying()) {
-                // Логика полета: убираем падение и добавляем скорость вперед
+                // Включаем режим полета (как в креативе)
                 player.getAbilities().flying = true;
-                player.getAbilities().setFlySpeed(0.05f);
+                player.getAbilities().setFlySpeed(0.08f); // Скорость чуть выше стандартной
             }
         }
     }
