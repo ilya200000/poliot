@@ -1,7 +1,6 @@
 package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,33 +14,32 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Если элитры надеты, но мы еще не летим - спамим пакет взлета
-        if (!player.isOnGround() && !player.isFallFlying() && player.getVelocity().y < -0.08) {
-            player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
-        }
-
-        if (player.isFallFlying()) {
+        // Если элитры раскрыты
+        if (player != null && player.isFallFlying()) {
+            // Вектор взгляда
             Vec3d look = player.getRotationVec(1.0F);
             
-            // Снижаем скорость до 0.18 - это предел для многих античитов (Grim/Matrix)
-            double s = 0.18; 
-            
-            // Постоянный импульс вперед
-            player.addVelocity(look.x * s, look.y * s, look.z * s);
+            // СКОРОСТЬ: 0.45 — это быстро (как фейерверк). 
+            // Если будет кикать "Fly", снизь до 0.25
+            double speed = 0.45; 
 
-            // ANTI-KICK: Серверу нужно видеть, что ты падаешь.
-            // Каждые 5 тиков мы принудительно тянем тебя вниз на мизерное расстояние.
-            if (player.age % 5 == 0) {
-                player.addVelocity(0, -0.02, 0);
-            } else {
-                // В остальное время держим высоту
-                player.addVelocity(0, 0.015, 0);
-            }
-            
+            // Устанавливаем скорость СТРОГО по направлению взгляда
+            // Это дает тот самый эффект "управляемой ракеты"
+            player.setVelocity(look.x * speed, look.y * speed, look.z * speed);
+
+            // Чтобы сервер не думал, что ты стоишь в воздухе (Anti-Kick)
+            // Мы позволяем игре считать, что ты летишь, обнуляя урон
             player.fallDistance = 0;
+            
+            // Фикс для приземления: если подлетаешь близко к земле, 
+            // немного замедляемся, чтобы не крашнуло об блоки
+            if (player.isOnGround()) {
+                player.getAbilities().flying = false;
+            }
         }
     }
 }
+
 
 
 
