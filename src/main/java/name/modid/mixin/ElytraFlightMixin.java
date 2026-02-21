@@ -14,34 +14,31 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Работает ТОЛЬКО когда элитры уже раскрыты
+        // Проверяем, что игрок реально летит на элитрах
         if (player.isFallFlying()) {
-            // Получаем направление, куда ты смотришь
+            // Направление взгляда
             Vec3d look = player.getRotationVec(1.0F);
             
-            // Настройка скорости (0.15 - стабильно, 0.4 - быстро)
+            // Скорость (0.25 - золотая середина)
             double speed = 0.25;
 
-            // Движение вперед при нажатии W
-            if (player.input.pressingForward) {
-                // Применяем импульс к текущей скорости (addVelocity безопаснее)
+            // Если игрок нажимает клавиши движения (любые)
+            // Мы проверяем это через стандартный метод, который не крашит
+            if (player.input.movementForward > 0) {
+                // Плавное ускорение вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
-                
-                // Ограничиваем максимальную скорость, чтобы не выкинуло с сервера
-                Vec3d velocity = player.getVelocity();
-                if (velocity.length() > 1.5) {
-                    player.setVelocity(velocity.multiply(0.8));
-                }
             } else {
-                // Если кнопки не нажаты - просто зависаем (анти-падение)
-                player.setVelocity(player.getVelocity().x, -0.001, player.getVelocity().z);
+                // Зависание в воздухе
+                Vec3d velocity = player.getVelocity();
+                player.setVelocity(velocity.x, -0.001, velocity.z);
             }
 
             // Убираем урон от падения
-            player.onLanding();
+            player.fallDistance = 0;
         }
     }
 }
+
 
 
 
