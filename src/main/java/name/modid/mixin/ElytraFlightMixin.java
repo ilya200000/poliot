@@ -15,40 +15,36 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Полная защита от краша при заходе
+        // Самая жесткая защита от крашей (проверка всего)
         if (player == null || player.networkHandler == null) return;
 
         if (player.isFallFlying()) {
             MinecraftClient client = MinecraftClient.getInstance();
+            Vec3d look = player.getRotationVec(1.0F);
             
-            // Проверка кнопки через настройки (самый стабильный способ)
-            if (client.options.forwardKey.isPressed()) {
-                Vec3d look = player.getRotationVec(1.0F);
-                
-                // СКОРОСТЬ ДЛЯ REALLYWORLD: 0.11 - 0.13. 
-                // Это "тихий" режим, который античит не видит как Fly.
-                double speed = 0.12;
+            // СКОРОСТЬ ДЛЯ REALLYWORLD: 0.13 — это край. 
+            // Если будет флажить (откидывать), снизь до 0.1.
+            double speed = 0.8;
 
-                // Вместо создания пакетов (которые крашат), используем addVelocity. 
-                // В 1.21.11 это единственный 100% стабильный способ.
-                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
-                
-                // BYPASS ДЛЯ MYSTERY/REALLYWORLD (Anti-Fly):
-                // Античит палит, если ты не падаешь. Мы заставляем персонажа 
-                // микроскопически "дрожать" по вертикали, имитируя полет.
-                Vec3d v = player.getVelocity();
-                if (player.age % 4 == 0) {
-                    player.setVelocity(v.x, v.y - 0.03, v.z); // Провал вниз
-                } else {
-                    player.setVelocity(v.x, v.y + 0.025, v.z); // Подтяжка вверх
-                }
-            } else {
-                // Если W не нажата - просто парим без падения камнем
-                Vec3d v = player.getVelocity();
-                player.setVelocity(v.x, -0.005, v.z);
+            // 1. ДВИЖЕНИЕ (Только если жмешь W)
+            if (client.options.forwardKey.isPressed()) {
+                // Вместо addVelocity, ставим жесткий вектор, но МЯГКИЙ
+                Vec3d currentVel = player.getVelocity();
+                player.setVelocity(look.x * speed, currentVel.y, look.z * speed);
             }
 
-            // Убираем урон от падения
+            // 2. BYPASS GRIM (Вертикальный обход)
+            // Самое важное: сервер RW кикает, если ты не падаешь.
+            // Мы делаем "ступеньку": 3 тика висим, 1 тик падаем.
+            if (player.age % 4 == 0) {
+                player.addVelocity(0, -0.05, 0); // Имитация падения
+            } else {
+                // Удерживаем высоту микро-импульсом
+                Vec3d v = player.getVelocity();
+                player.setVelocity(v.x, 0.01, v.z);
+            }
+
+            // 3. NO-FALL (Чтобы не сдохнуть при лаге)
             player.onLanding();
         }
     }
