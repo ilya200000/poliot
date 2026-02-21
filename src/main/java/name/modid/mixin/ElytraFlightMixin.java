@@ -16,8 +16,9 @@ public abstract class ElytraFlightMixin {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
         if (player != null && player.isFallFlying()) {
-            // Прямая проверка кнопок через MinecraftClient (самый надежный способ)
             MinecraftClient client = MinecraftClient.getInstance();
+            
+            // Проверяем нажатие кнопок
             boolean isForward = client.options.forwardKey.isPressed();
             boolean isJump = client.options.jumpKey.isPressed();
 
@@ -25,17 +26,21 @@ public abstract class ElytraFlightMixin {
             double speed = 0.25;
 
             if (isForward) {
+                // Ускорение вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
             } else {
+                // Зависание
                 Vec3d v = player.getVelocity();
                 player.setVelocity(v.x, -0.005, v.z);
             }
 
             if (isJump) {
+                // Набор высоты
                 player.addVelocity(0, 0.1, 0);
             }
 
-            player.setFallDistance(0);
+            // Прямое исправление дистанции падения (чтобы не разбиться)
+            player.fallDistance = 0;
         }
     }
 }
