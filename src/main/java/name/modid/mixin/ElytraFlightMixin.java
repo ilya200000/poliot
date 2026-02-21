@@ -2,7 +2,6 @@ package name.modid.mixin;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,37 +14,46 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
+
+        // Полная защита от краша при заходе
         if (player == null || player.networkHandler == null) return;
 
         if (player.isFallFlying()) {
             MinecraftClient client = MinecraftClient.getInstance();
             
-            // Если жмем W
+            // Проверка кнопки через настройки (самый стабильный способ)
             if (client.options.forwardKey.isPressed()) {
                 Vec3d look = player.getRotationVec(1.0F);
                 
-                // СКОРОСТЬ 0.14 - это предел для Grim Anticheat
-                double s = 0.14;
+                // СКОРОСТЬ ДЛЯ REALLYWORLD: 0.11 - 0.13. 
+                // Это "тихий" режим, который античит не видит как Fly.
+                double speed = 0.12;
 
-                // Вместо addVelocity (которое палится), мы "телепортируем" пакет
-                // Каждые 2 тика шлем серверу пакет: "я здесь и я падаю"
-                if (player.age % 2 == 0) {
-                    double x = player.getX() + look.x * s;
-                    double y = player.getY() + (look.y * s) - 0.02; // Имитируем падение (Y вниз)
-                    double z = player.getZ() + look.z * s;
-
-                    // Шлем пакет позиции (в 1.21.11 ровно 4 аргумента: x, y, z, onGround)
-                    player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, false));
-                    player.setPosition(x, y, z);
+                // Вместо создания пакетов (которые крашат), используем addVelocity. 
+                // В 1.21.11 это единственный 100% стабильный способ.
+                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
+                
+                // BYPASS ДЛЯ MYSTERY/REALLYWORLD (Anti-Fly):
+                // Античит палит, если ты не падаешь. Мы заставляем персонажа 
+                // микроскопически "дрожать" по вертикали, имитируя полет.
+                Vec3d v = player.getVelocity();
+                if (player.age % 4 == 0) {
+                    player.setVelocity(v.x, v.y - 0.03, v.z); // Провал вниз
+                } else {
+                    player.setVelocity(v.x, v.y + 0.025, v.z); // Подтяжка вверх
                 }
+            } else {
+                // Если W не нажата - просто парим без падения камнем
+                Vec3d v = player.getVelocity();
+                player.setVelocity(v.x, -0.005, v.z);
             }
 
-            // Визуальное падение для сервера (чтобы не кикнуло за Fly)
-            player.setVelocity(player.getVelocity().x, -0.01, player.getVelocity().z);
+            // Убираем урон от падения
             player.onLanding();
         }
     }
 }
+
 
 
 
