@@ -10,40 +10,35 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
-    
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-
         if (player != null && player.isFallFlying()) {
             MinecraftClient client = MinecraftClient.getInstance();
-            
-            // Самый стабильный способ проверки кнопок
             boolean isForward = client.options.forwardKey.isPressed();
-            boolean isJump = client.options.jumpKey.isPressed();
-
+            
             Vec3d look = player.getRotationVec(1.0F);
-            double speed = 0.25;
+            double speed = 0.18; // Безопасная скорость для Mystery
 
             if (isForward) {
-                // Применяем импульс вперед
+                // Толкаем вперед
                 player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
+            }
+
+            // ОБХОД АНТИЧИТА: Микро-движение вниз каждые 10 тиков
+            if (player.age % 10 == 0) {
+                player.addVelocity(0, -0.05, 0);
             } else {
-                // Плавное зависание
+                // В остальное время компенсируем падение
                 Vec3d v = player.getVelocity();
-                player.setVelocity(v.x, -0.005, v.z);
+                player.setVelocity(v.x, v.y + 0.045, v.z);
             }
 
-            if (isJump) {
-                // Набор высоты
-                player.addVelocity(0, 0.1, 0);
-            }
-
-            // ИСПОЛЬЗУЕМ МЕТОД ВМЕСТО ПОЛЯ, чтобы не было NoSuchFieldError
-            player.onLanding();
+            player.onLanding(); // Сброс урона
         }
     }
 }
+
 
 
 
