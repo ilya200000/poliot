@@ -10,40 +10,55 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
     
-    @Inject(method = "tick", at = @At("HEAD"))
+    @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        
-        // 1. ПРОВЕРКА НА КРАШ (Защита от Null в 1.21.11)
-        if (player == null || player.getWorld() == null || player.getAbilities() == null) return;
 
-        // 2. АВТО-ВЗЛЕТ
+        // 1. ЗАЩИТА ОТ КРАША (Для 1.20.1)
+        // Проверяем, что игрок в мире и управление инициализировано
+        if (player == null || player.clientWorld == null || player.input == null) return;
+
+        // 2. АВТО-ВЗЛЕТ (Bypass активация)
+        // Если падаем чуть-чуть — раскрываем элитры сами
         if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
-        // 3. ПОЛЕТ (MysteryWorld Bypass)
+        // 3. ЛОГИКА ПОЛЕТА
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
             Vec3d v = player.getVelocity();
 
-            // Безопасная скорость для Grim (0.05)
-            double speed = 0.052;
+            // ПАРАМЕТРЫ ДЛЯ MYSTERYWORLD (Grim)
+            double speed = 0.056; // Скорость (0.05 - 0.06 безопасно)
+            double limit = 0.6;  // Порог, выше которого Grim кикает
 
-            // Если зажат прыжок — летим вверх, иначе — глайд -0.01
-            double movementY = player.isJumping() ? 0.04 : (v.y < -0.01 ? -0.01 - v.y : 0);
+            // Горизонтальное ускорение (только если не превышаем лимит)
+            if (v.horizontalLength() < limit) {
+                player.addVelocity(look.x * speed, 0, look.z * speed);
+            }
 
-            player.addVelocity(look.x * speed, movementY, look.z * speed);
+            // ВЕРТИКАЛЬНЫЙ КОНТРОЛЬ (Анти-кик режим)
+            if (player.input.jumping) {
+                // Плавный набор высоты (на Пробел)
+                player.addVelocity(0, 0.04, 0);
+            } else if (player.input.sneaking) {
+                // Быстрый спуск (на Shift)
+                player.addVelocity(0, -0.2, 0);
+            } else {
+                // ГЛАЙД (Зависание): Grim считает падение -0.01 легитимным
+                if (v.y < -0.01) {
+                    player.setVelocity(v.x, -0.01, v.z);
+                }
+            }
 
-            // Мягкое обнуление урона
-            if (player.fallDistance > 1.2f) {
+            // ОБНУЛЕНИЕ УРОНА (Безопасно для 1.20.1)
+            if (player.fallDistance > 1.0f) {
                 player.fallDistance = 0;
             }
         }
     }
 }
-
-
 
 
 
