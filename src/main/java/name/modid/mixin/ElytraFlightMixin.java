@@ -10,54 +10,38 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
     
-    @Inject(method = "tick", at = @At("HEAD")) // Используем HEAD для стабильности
+    @Inject(method = "tick", at = @At("HEAD"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         
-        // Базовая проверка, чтобы не крашнуло в меню
-        if (player == null || player.getAbilities() == null) return;
+        // 1. ПРОВЕРКА НА КРАШ (Защита от Null в 1.21.11)
+        if (player == null || player.getWorld() == null || player.getAbilities() == null) return;
 
-        // 1. АВТО-ВЗЛЕТ (Если падаем без элитр)
+        // 2. АВТО-ВЗЛЕТ
         if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
-        // 2. ЛОГИКА ПОЛЕТА
+        // 3. ПОЛЕТ (MysteryWorld Bypass)
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
             Vec3d v = player.getVelocity();
 
-            // Безопасная скорость для MysteryWorld
-            double speed = 0.05; 
+            // Безопасная скорость для Grim (0.05)
+            double speed = 0.052;
 
-            // Движение вперед (добавляем к текущему вектору)
-            double mx = look.x * speed;
-            double mz = look.z * speed;
-            double my = 0;
+            // Если зажат прыжок — летим вверх, иначе — глайд -0.01
+            double movementY = player.isJumping() ? 0.04 : (v.y < -0.01 ? -0.01 - v.y : 0);
 
-            // Управление высотой через ванильные кнопки
-            if (player.input.jumping) {
-                my = 0.03; // Вверх
-            } else if (player.input.sneaking) {
-                my = -0.15; // Вниз
-            } else {
-                // Глайд-режим (анти-гравитация)
-                if (v.y < -0.01) {
-                    my = 0.008; // Чуть подталкиваем вверх, чтобы падение было -0.01
-                }
-            }
+            player.addVelocity(look.x * speed, movementY, look.z * speed);
 
-            // Устанавливаем скорость напрямую через поля (самый стабильный способ)
-            player.addVelocity(mx, my, mz);
-
-            // 3. ФИКС УРОНА (Чтобы не разбиться при посадке)
-            if (player.fallDistance > 1.0f) {
+            // Мягкое обнуление урона
+            if (player.fallDistance > 1.2f) {
                 player.fallDistance = 0;
             }
         }
     }
 }
-
 
 
 
