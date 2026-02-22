@@ -2,13 +2,13 @@
   "required": true,
   "minVersion": "0.8",
   "package": "name.modid.mixin",
-  "compatibilityLevel": "JAVA_21",
-  "mixins": [],
-  "client": [
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
     "ElytraFlightMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   }
 }
+
 
