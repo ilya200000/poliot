@@ -1,62 +1,48 @@
-package name.modid.mixin;
-
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.util.math.Vec3d;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
     
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
+        if (player == null || player.networkHandler == null) return;
 
-        if (player == null || player.getWorld() == null) return;
-
-        // 1. АВТО-ВЗЛЕТ (Если прыгнули - сразу летим)
-        if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
-            player.checkFallFlying();
+        // 1. Умный автовзлет (без рывков)
+        if (!player.isOnGround() && player.getVelocity().y < -0.01 && !player.isFallFlying()) {
+            // Вместо checkFallFlying отправляем пакет о начале полета
+            player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
             
-            // СКОРОСТЬ 0.08 — Безопасно для MysteryWorld. 
-            // 0.15 — Максимально быстро, но может кикнуть.
-            double speed = 0.085; 
+            // Безопасная скорость для 1.20.1
+            double speedMultiplier = 0.07; 
 
-            // 2. ДВИЖЕНИЕ ВПЕРЕД (W)
+            // 2. Движение вперед (W)
             if (player.input.pressingForward) {
-                // Плавное ускорение (имитация фейерверка)
-                player.addVelocity(look.x * speed, look.y * speed, look.z * speed);
+                Vec3d velocity = player.getVelocity();
+                // Используем плавное приращение, чтобы античит не видел телепортации
+                player.setVelocity(velocity.add(look.x * speedMultiplier, look.y * speedMultiplier, look.z * speedMultiplier));
             }
 
-            // 3. УПРАВЛЕНИЕ ВЫСОТОЙ (Пробел / Shift)
+            // 3. Управление высотой
             if (player.input.jumping) {
-                // Подтяжка вверх
-                player.addVelocity(0, 0.05, 0);
+                player.addVelocity(0, 0.04, 0); // Плавный подъем
             } else if (player.input.sneaking) {
-                // Быстрый спуск
-                player.addVelocity(0, -0.15, 0);
+                player.addVelocity(0, -0.2, 0); // Быстрый спуск
             } else {
-                // БАЙПАС ПРИТЯЖЕНИЯ:
-                // Мы не даем серверу повода нас приземлить.
-                // Оставляем ванильную гравитацию, но компенсируем её на 95%
+                // ВАЖНО: Не ставим Y в 0.0. Оставляем минимальное падение (-0.01), 
+                // чтобы сервер не кикнул за "Hover" (левитацию).
                 Vec3d v = player.getVelocity();
                 if (v.y < -0.01) {
-                    player.setVelocity(v.x, -0.005, v.z);
+                    player.setVelocity(v.x, -0.01, v.z);
                 }
             }
-
-            // Защита от урона при посадке
-            player.onLanding();
+            
+            // Убираем player.onLanding(), на 1.20.1 это вызывает десинк.
         }
     }
 }
-
 
 
 
