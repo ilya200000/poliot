@@ -28,7 +28,7 @@ public abstract class ElytraFlightMixin {
 
             // 2. РАСЧЕТ ДВИЖЕНИЯ
             // 0.25 — это предел. Если кикает, ставь 0.18
-            double speed = 0.25; 
+            double speed = 0.12; 
             Vec3d look = player.getRotationVec(1.0F);
             
             double x = player.getX();
