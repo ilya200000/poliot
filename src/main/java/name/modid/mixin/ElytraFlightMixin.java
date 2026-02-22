@@ -1,6 +1,7 @@
 package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,48 +15,34 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // ИСПРАВЛЕНО: world вместо clientWorld для 1.20.1
-        if (player == null || player.getWorld() == null || player.input == null) return;
-
-        // 1. АВТО-ВЗЛЕТ (Bypass для MysteryWorld)
-        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
-            player.checkFallFlying();
-        }
+        // Полная защита от вылетов на 1.20.1
+        if (player == null || player.getWorld() == null || player.networkHandler == null) return;
 
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
-            Vec3d v = player.getVelocity();
+            
+            // СКОРОСТЬ 0.11 - предел для BedWars Mystery. Выше - откинет назад.
+            double speed = 0.11; 
 
-            // --- НАСТРОЙКИ (MysteryWorld / Grim) ---
-            // 0.058 - идеальный буст, не палится античитом
-            double boostPower = 0.058; 
-            double maxSpeed = 0.7; 
-
-            // 2. УСКОРЕНИЕ (W)
             if (player.input.pressingForward) {
-                if (v.horizontalLength() < maxSpeed) {
-                    player.addVelocity(
-                        look.x * boostPower,
-                        look.y * boostPower * 0.5, 
-                        look.z * boostPower
-                    );
+                // ОБХОД ПРИТЯЖЕНИЯ (Grim Bypass)
+                // Каждые 2 тика шлем серверу пакет: "я здесь и я легально падаю"
+                if (player.age % 2 == 0) {
+                    double nextX = player.getX() + look.x * speed;
+                    double nextY = player.getY() + (look.y * speed) - 0.035; // Имитация падения (Y вниз)
+                    double nextZ = player.getZ() + look.z * speed;
+
+                    // Для 1.20.1: конструктор принимает 4 аргумента (x, y, z, onGround)
+                    player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(nextX, nextY, nextZ, false));
+                    player.setPosition(nextX, nextY, nextZ);
                 }
             }
 
-            // 3. УПРАВЛЕНИЕ (Пробел / Shift)
-            if (player.input.jumping) {
-                player.addVelocity(0, 0.05, 0); // Вверх
-            } else if (player.input.sneaking) {
-                player.addVelocity(0, -0.2, 0); // Вниз
-            } else {
-                // БАЙПАС: Фиксируем падение на -0.01 (сервер видит планирование)
-                if (v.y < -0.01) {
-                    player.setVelocity(v.x, -0.01, v.z);
-                }
-            }
-
-            // 4. БЕЗОПАСНОСТЬ
-            player.onLanding(); // Сброс урона (безопаснее чем fallDistance = 0)
+            // Плавное визуальное снижение
+            Vec3d v = player.getVelocity();
+            player.setVelocity(v.x, -0.015, v.z);
+            
+            player.onLanding(); // Сброс урона
         }
     }
 }
