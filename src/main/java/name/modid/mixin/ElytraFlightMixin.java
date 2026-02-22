@@ -2,8 +2,7 @@ package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
-import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -12,49 +11,51 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
 
-    private int boostTimer = 0;
-
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         if (player == null || player.networkHandler == null) return;
 
-        // 1. АВТОВЗЛЕТ (Стандарт)
+        // 1. АВТОВЗЛЕТ
         if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
         if (player.isFallFlying()) {
-            // 2. БАЙПАС "FIREWORK SPOOF"
-            // Когда жмешь W, мы шлем пакет, что ты заюзал предмет в руке. 
-            // Сервер думает, что это фейерверк, и дает тебе ванильное ускорение.
+            Vec3d v = player.getVelocity();
+            Vec3d look = player.getRotationVec(1.0F);
+
+            // 2. BOUNCE / CONSTANT SPEED
+            // Мы берем текущую горизонтальную скорость и не даем ей упасть
+            double currentSpeed = Math.sqrt(v.x * v.x + v.z * v.z);
+            double targetSpeed = 0.5; // Базовая скорость (чуть выше обычной элитры)
+
             if (player.input.pressingForward) {
-                boostTimer++;
-                if (boostTimer >= 15) { // Не спамим, имитируем задержку фейерверка
-                    // Шлем пакет "Использование предмета"
-                    player.networkHandler.sendPacket(new PlayerInteractItemC2SPacket(Hand.MAIN_HAND, 0));
-                    boostTimer = 0;
+                // Если мы замедляемся — подталкиваем до targetSpeed
+                if (currentSpeed < targetSpeed) {
+                    player.setVelocity(look.x * targetSpeed, v.y, look.z * targetSpeed);
                 }
-                
-                // Минимальный "пинок" для клиента, чтобы синхронизировать движение
-                player.addVelocity(player.getRotationVec(1.0F).x * 0.05, 0.01, player.getRotationVec(1.0F).z * 0.05);
             }
 
-            // 3. УПРАВЛЕНИЕ ВЫСОТОЙ (Легит)
-            if (player.input.jumping) {
-                player.addVelocity(0, 0.02, 0);
-            } else if (player.input.sneaking) {
-                player.addVelocity(0, -0.2, 0);
+            // 3. GLIDE (Отмена падения)
+            // Вместо 0.0 (за что кикают), ставим -0.01. Ты падаешь на 1 блок за 100 секунд.
+            if (!player.input.jumping && !player.input.sneaking) {
+                if (v.y < -0.01) {
+                    player.setVelocity(player.getVelocity().x, -0.01, player.getVelocity().z);
+                }
             }
-            
-            // Если слишком медленно падаем - античит кикнет. 
-            // Даем игроку падать со скоростью -0.05 (почти незаметно)
-            if (player.getVelocity().y > -0.05 && !player.input.jumping) {
-                player.setVelocity(player.getVelocity().x, -0.05, player.getVelocity().z);
+
+            // 4. УПРАВЛЕНИЕ
+            if (player.input.jumping) {
+                player.addVelocity(0, 0.05, 0); // Плавный набор высоты
+            }
+            if (player.input.sneaking) {
+                player.addVelocity(0, -0.2, 0); // Спуск
             }
         }
     }
 }
+
 
 
 
