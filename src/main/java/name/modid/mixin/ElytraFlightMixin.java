@@ -1,8 +1,9 @@
 package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
+import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,36 +18,42 @@ public abstract class ElytraFlightMixin {
         if (player == null || player.networkHandler == null) return;
 
         // 1. АВТОВЗЛЕТ
-        if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
+        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
         if (player.isFallFlying()) {
-            // 2. ОБМАН СЕРВЕРА (Pitch Spoof)
-            // Если зажат W, мы шлем серверу пакет, что мы якобы смотрим вверх-вниз
+            // 2. РЕЖИМ "РВАНОГО" ПОЛЕТА
             if (player.input.pressingForward) {
-                float fakePitch = (player.age % 10 < 5) ? -2.0F : 10.0F; 
+                Vec3d look = player.getRotationVec(1.0F);
+                // Прыжок на 0.25 блока (безопасно для большинства античитов)
+                double x = player.getX() + look.x * 0.25;
+                double y = player.getY() + look.y * 0.25;
+                double z = player.getZ() + look.z * 0.25;
+
+                // Шлем серверу пакет: "Я уже здесь"
+                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, false));
+                // Визуально двигаем камеру
+                player.setPosition(x, y, z);
                 
-                // Шлем серверу фейковый поворот головы, чтобы он сам обсчитал ускорение элитры
-                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.LookAndOnGround(
-                        player.getYaw(), 
-                        fakePitch, 
-                        player.isOnGround()
-                ));
+                // Обнуляем скорость, чтобы сервер не считал накопленную инерцию
+                player.setVelocity(0, 0, 0);
             }
 
-            // 3. ЛЕГИТНЫЙ ПОДЪЕМ
+            // 3. ПОДДЕРЖКА ВЫСОТЫ (Space)
             if (player.input.jumping) {
-                player.addVelocity(0, 0.01, 0); 
+                player.setPosition(player.getX(), player.getY() + 0.1, player.getZ());
+                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(player.getX(), player.getY(), player.getZ(), false));
             }
             
-            // Если нас начинает сильно тянуть вниз, даем микро-импульс (безопасно)
-            if (player.getVelocity().y < -0.01 && !player.input.sneaking) {
-                player.addVelocity(0, 0.02, 0);
+            // Даем серверу "успокоиться" — микропадение раз в 5 тиков
+            if (player.age % 5 == 0) {
+                player.addVelocity(0, -0.01, 0);
             }
         }
     }
 }
+
 
 
 
