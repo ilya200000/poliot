@@ -13,45 +13,47 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        if (player == null || !player.isFallFlying()) return;
+        if (player == null || player.networkHandler == null) return;
 
-        // На MysteryWorld нельзя лететь вверх слишком быстро — кикнет за "Fly"
-        // Поэтому мы будем просто поддерживать горизонтальную скорость.
-        
-        Vec3d look = player.getRotationVec(1.0F);
-        Vec3d velocity = player.getVelocity();
-
-        // 1. МЯГКОЕ УСКОРЕНИЕ (Bypass для Grim)
-        // Мы не ставим скорость (setVelocity), а добавляем её (addVelocity)
-        // 0.05 - это безопасный порог, при котором античит думает, что ты просто хорошо планируешь
-        double speedMultiplier = 0.05;
-
-        if (player.input.jumping) {
-            // Если зажат пробел — медленно набираем высоту (имитация фейерверка)
-            player.addVelocity(0, 0.03, 0);
+        // 1. АВТО-АКТИВАЦИЯ (Для захода на полет без фейерверка)
+        if (!player.isOnGround() && player.getVelocity().y < -0.01 && !player.isFallFlying()) {
+            player.checkFallFlying();
         }
 
-        // Подталкиваем игрока вперед по направлению взгляда
-        player.addVelocity(
-            look.x * speedMultiplier,
-            0, // Высоту лучше не трогать напрямую, чтобы не флагало
-            look.z * speedMultiplier
-        );
+        if (player.isFallFlying()) {
+            Vec3d look = player.getRotationVec(1.0F);
+            Vec3d velocity = player.getVelocity();
 
-        // 2. ЛИМИТЕР (Чтобы тебя не разогнало до бана)
-        Vec3d v = player.getVelocity();
-        double maxSpeed = 0.6; // Предел скорости для Mystery
-        if (v.horizontalLength() > maxSpeed) {
-            player.setVelocity(v.x * 0.9, v.y, v.z * 0.9);
-        }
+            // СКОРОСТЬ ДЛЯ MYSTERYWORLD (Безопасный порог 0.04 - 0.06)
+            double speed = 0.052; 
 
-        // 3. АНТИ-ГРАВИТАЦИЯ (Чтобы не падать камнем вниз)
-        // Каждые 2 тика замедляем падение
-        if (player.age % 2 == 0 && v.y < 0) {
-            player.setVelocity(v.x, v.y * 0.8, v.z);
+            // 2. УМНОЕ УСКОРЕНИЕ (Не ломает вектор движения)
+            // Мы просто чуть-чуть подталкиваем игрока вперед
+            player.addVelocity(
+                look.x * speed,
+                0, // По Y не трогаем, чтобы не было флагов за Fly
+                look.z * speed
+            );
+
+            // 3. АНТИ-ПАДЕНИЕ (Замедление гравитации)
+            // Если мы начинаем падать слишком быстро, замедляем вертикальную скорость
+            if (velocity.y < -0.05) {
+                player.setVelocity(player.getVelocity().x, -0.02, player.getVelocity().z);
+            }
+
+            // 4. ВЗЛЕТ НА ПРОБЕЛ (Имитация набора высоты)
+            if (player.input.jumping) {
+                player.addVelocity(0, 0.04, 0);
+            }
+
+            // Сброс дистанции падения, чтобы не разбиться
+            if (player.fallDistance > 2) {
+                player.onLanding();
+            }
         }
     }
 }
+
 
 
 
