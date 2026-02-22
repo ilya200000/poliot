@@ -2,20 +2,23 @@
   "schemaVersion": 1,
   "id": "poliot",
   "version": "1.0.0",
-  "name": "poliot",
-  "description": "Advanced Elytra Fly with Architectury",
-  "authors": ["Me!"],
-  "license": "CC0-1.0",
-  "environment": "*",
-  "entrypoints": {},
+  "name": "Poliot",
+  "description": "Elytra Flight for MysteryWorld",
+  "authors": ["YourName"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/poliot/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "main": []
+  },
   "mixins": [
     "poliot.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.16.0",
-    "minecraft": ">=1.21.1",
-    "java": ">=21",
-    "architectury": ">=13.0.6"
+    "fabricloader": ">=0.14.22",
+    "minecraft": "1.20.1",
+    "java": ">=17"
   }
 }
 
