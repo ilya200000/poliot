@@ -13,46 +13,52 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        if (player == null || player.networkHandler == null) return;
+        
+        // Проверка на мир и сессию (чтобы не вылетало при загрузке с Architectury)
+        if (player == null || player.clientWorld == null || player.networkHandler == null) return;
 
-        // 1. АВТО-АКТИВАЦИЯ (Для захода на полет без фейерверка)
-        if (!player.isOnGround() && player.getVelocity().y < -0.01 && !player.isFallFlying()) {
+        // 1. АВТО-ВЗЛЕТ (Если падаем, пытаемся раскрыть элитры)
+        if (!player.isOnGround() && player.getVelocity().y < -0.2 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
-            Vec3d velocity = player.getVelocity();
+            Vec3d v = player.getVelocity();
 
-            // СКОРОСТЬ ДЛЯ MYSTERYWORLD (Безопасный порог 0.04 - 0.06)
-            double speed = 0.052; 
+            // НАСТРОЙКИ ДЛЯ MYSTERYWORLD (Grim Anticheat)
+            double speed = 0.06; // Безопасное ускорение
+            double limit = 0.55; // Максимальная горизонтальная скорость
 
-            // 2. УМНОЕ УСКОРЕНИЕ (Не ломает вектор движения)
-            // Мы просто чуть-чуть подталкиваем игрока вперед
-            player.addVelocity(
-                look.x * speed,
-                0, // По Y не трогаем, чтобы не было флагов за Fly
-                look.z * speed
-            );
-
-            // 3. АНТИ-ПАДЕНИЕ (Замедление гравитации)
-            // Если мы начинаем падать слишком быстро, замедляем вертикальную скорость
-            if (velocity.y < -0.05) {
-                player.setVelocity(player.getVelocity().x, -0.02, player.getVelocity().z);
+            // 2. ГОРИЗОНТАЛЬНОЕ УСКОРЕНИЕ (Плавное "подталкивание")
+            if (v.horizontalLength() < limit) {
+                player.addVelocity(look.x * speed, 0, look.z * speed);
             }
 
-            // 4. ВЗЛЕТ НА ПРОБЕЛ (Имитация набора высоты)
+            // 3. УПРАВЛЕНИЕ ВЕРТИКАЛЬЮ (Bypass: имитируем ванильное падение)
             if (player.input.jumping) {
-                player.addVelocity(0, 0.04, 0);
+                // Плавный подъем (на пробел)
+                player.addVelocity(0, 0.05, 0);
+            } else if (player.input.sneaking) {
+                // Быстрый спуск (на Shift)
+                player.addVelocity(0, -0.15, 0);
+            } else {
+                // ГЛИЙД-РЕЖИМ: фиксируем падение на грани фола (-0.01)
+                // Это позволяет лететь прямо очень долго без флагов Grim
+                if (v.y < -0.01) {
+                    player.setVelocity(v.x, -0.01, v.z);
+                }
             }
 
-            // Сброс дистанции падения, чтобы не разбиться
-            if (player.fallDistance > 2) {
-                player.onLanding();
+            // 4. ЗАЩИТА ОТ КРАША И УРОНА
+            // Просто обнуляем дистанцию падения, чтобы Architectury не считал урон
+            if (player.fallDistance > 1.0F) {
+                player.fallDistance = 0;
             }
         }
     }
 }
+
 
 
 
