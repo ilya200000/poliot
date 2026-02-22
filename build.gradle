@@ -1,21 +1,32 @@
 plugins {
-    id 'fabric-loom' version '1.7.4'
+    id 'fabric-loom' version '1.4-SNAPSHOT'
 }
 
-version = '1.0.0'
-group = 'name.modid'
+version = "1.0.0"
+group = "name.modid"
 
-repositories {
-    mavenCentral()
-    maven { url = "https://maven.fabricmc.net" }
-    maven { url = "https://maven.architectury.dev" }
-}
+repositories {}
 
 dependencies {
-    minecraft "com.mojang:minecraft:1.21.1" // База 1.21.1 подходит для 1.21.11
-    mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
-    modImplementation "net.fabricmc:fabric-loader:0.16.7"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:0.106.0+1.21.1"
-    modImplementation "dev.architectury:architectury-fabric:13.0.6"
+    minecraft "com.mojang:minecraft:1.20.1"
+    mappings "net.fabricmc:yarn:1.20.1+build.10:v2"
+    modImplementation "net.fabricmc:fabric-loader:0.14.22"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.92.0+1.20.1"
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 17
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
