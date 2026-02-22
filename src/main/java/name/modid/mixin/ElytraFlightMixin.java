@@ -12,47 +12,58 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
 
-    @Inject(method = "tick", at = @At("HEAD"))
+    private int teleportId = 0;
+
+    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         if (player == null || player.networkHandler == null) return;
 
-        // 1. АВТОВЗЛЕТ
-        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
+        // 1. АВТОВЗЛЕТ (Force Start)
+        if (!player.isOnGround() && player.getVelocity().y < -0.01 && !player.isFallFlying()) {
             player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
         if (player.isFallFlying()) {
-            // 2. РЕЖИМ "РВАНОГО" ПОЛЕТА
+            // 2. ОТКЛЮЧАЕМ ВАНИЛЬНУЮ ФИЗИКУ (Grim Bypass)
+            // Мы сами будем слать пакеты движения, минуя расчеты клиента
+            Vec3d look = player.getRotationVec(1.0F);
+            double speed = 0.15; // Начни с 0.15. Если не кикает - ставь 0.25
+
+            double nextX = player.getX();
+            double nextY = player.getY();
+            double nextZ = player.getZ();
+
             if (player.input.pressingForward) {
-                Vec3d look = player.getRotationVec(1.0F);
-                // Прыжок на 0.25 блока (безопасно для большинства античитов)
-                double x = player.getX() + look.x * 0.25;
-                double y = player.getY() + look.y * 0.25;
-                double z = player.getZ() + look.z * 0.25;
-
-                // Шлем серверу пакет: "Я уже здесь"
-                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, false));
-                // Визуально двигаем камеру
-                player.setPosition(x, y, z);
-                
-                // Обнуляем скорость, чтобы сервер не считал накопленную инерцию
-                player.setVelocity(0, 0, 0);
+                nextX += look.x * speed;
+                nextZ += look.z * speed;
+                nextY += look.y * speed;
             }
+            if (player.input.jumping) nextY += speed / 2;
+            if (player.input.sneaking) nextY -= speed / 2;
 
-            // 3. ПОДДЕРЖКА ВЫСОТЫ (Space)
-            if (player.input.jumping) {
-                player.setPosition(player.getX(), player.getY() + 0.1, player.getZ());
-                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(player.getX(), player.getY(), player.getZ(), false));
-            }
+            // 3. ПАКЕТНЫЙ ХАК: Шлем пакет "Я стою", потом пакет "Я лечу"
+            // Это сбивает с толку систему предсказаний (Prediction)
+            player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(player.getX(), player.getY(), player.getZ(), true));
             
-            // Даем серверу "успокоиться" — микропадение раз в 5 тиков
-            if (player.age % 5 == 0) {
-                player.addVelocity(0, -0.01, 0);
-            }
+            // Основной пакет движения (ставим OnGround = false, чтобы сервер видел полет)
+            player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(
+                nextX, nextY, nextZ, 
+                player.getYaw(), player.getPitch(), 
+                false
+            ));
+
+            // Синхронизируем камеру, чтобы не было тряски
+            player.setPosition(nextX, nextY, nextZ);
+            player.setVelocity(0, 0, 0); // Обнуляем реальную скорость
+
+            // 4. ОТМЕНЯЕМ ВАНИЛЬНЫЙ ТИК
+            // Игра не будет тянуть тебя вниз, пока работает этот код
+            ci.cancel();
         }
     }
 }
+
 
 
 
