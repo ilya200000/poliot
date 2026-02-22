@@ -14,10 +14,10 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Базовая защита от вылетов на 1.20.1
-        if (player == null || player.clientWorld == null || player.input == null) return;
+        // ИСПРАВЛЕНО: world вместо clientWorld для 1.20.1
+        if (player == null || player.getWorld() == null || player.input == null) return;
 
-        // 1. АВТО-ВЗЛЕТ (Если падаем - раскрываем элитры)
+        // 1. АВТО-ВЗЛЕТ (Bypass для MysteryWorld)
         if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
@@ -26,43 +26,40 @@ public abstract class ElytraFlightMixin {
             Vec3d look = player.getRotationVec(1.0F);
             Vec3d v = player.getVelocity();
 
-            // --- НАСТРОЙКИ BOOST (Для MysteryWorld / Grim) ---
-            // 0.08 - очень быстро (может кикать), 0.05 - стабильно
+            // --- НАСТРОЙКИ (MysteryWorld / Grim) ---
+            // 0.058 - идеальный буст, не палится античитом
             double boostPower = 0.058; 
-            double maxSpeed = 0.7; // Лимит скорости, чтобы не забанило
+            double maxSpeed = 0.7; 
 
-            // 2. ЛОГИКА УСКОРЕНИЯ (Boost)
-            // Ускоряемся, если зажата клавиша "Вперед" (W)
+            // 2. УСКОРЕНИЕ (W)
             if (player.input.pressingForward) {
                 if (v.horizontalLength() < maxSpeed) {
-                    // Толкаем игрока по вектору взгляда (как фейерверк)
                     player.addVelocity(
                         look.x * boostPower,
-                        look.y * boostPower * 0.5, // Небольшой буст вверх
+                        look.y * boostPower * 0.5, 
                         look.z * boostPower
                     );
                 }
             }
 
-            // 3. ВЕРТИКАЛЬНЫЙ КОНТРОЛЬ (Bypass для Grim)
+            // 3. УПРАВЛЕНИЕ (Пробел / Shift)
             if (player.input.jumping) {
-                // Взлет на Пробел
-                player.addVelocity(0, 0.05, 0);
+                player.addVelocity(0, 0.05, 0); // Вверх
             } else if (player.input.sneaking) {
-                // Быстрый спуск на Shift
-                player.addVelocity(0, -0.2, 0);
+                player.addVelocity(0, -0.2, 0); // Вниз
             } else {
-                // ГЛАЙД: Фиксируем падение на -0.01 (идеально для обхода Fly)
+                // БАЙПАС: Фиксируем падение на -0.01 (сервер видит планирование)
                 if (v.y < -0.01) {
                     player.setVelocity(v.x, -0.01, v.z);
                 }
             }
 
-            // 4. ЗАЩИТА
-            player.fallDistance = 0; // Нет урона при посадке
+            // 4. БЕЗОПАСНОСТЬ
+            player.onLanding(); // Сброс урона (безопаснее чем fallDistance = 0)
         }
     }
 }
+
 
 
 
