@@ -23,24 +23,37 @@ public abstract class ElytraFlightMixin {
         }
 
         if (player.isFallFlying()) {
-            player.setVelocity(0, 0, 0);
+            ElytraData.tickCounter++;
+            
+            // Замораживаем клиентскую физику
+            player.setVelocity(0, 0.005, 0); 
 
-            double speed = 0.18; 
+            // СКОРОСТЬ: 0.2 — это край. Если откидывает — ставь 0.15
+            double speed = 0.2; 
             Vec3d look = player.getRotationVec(1.0F);
-            
-            double x = player.getX() + (player.input.pressingForward ? look.x * speed : 0);
-            double y = player.getY() + (player.input.jumping ? 0.12 : (player.input.sneaking ? -0.2 : -0.002));
-            double z = player.getZ() + (player.input.pressingForward ? look.z * speed : 0);
 
-            if (ElytraData.lastTeleportId != -1) {
+            // РЕЖИМ БЛИНКА: Шлем пакеты только каждый 3-й тик
+            // Это "лагание" обходит Prediction у Grim
+            if (ElytraData.tickCounter % 3 == 0) {
+                double x = player.getX() + (player.input.pressingForward ? look.x * speed * 3 : 0);
+                double y = player.getY() + (player.input.jumping ? 0.4 : (player.input.sneaking ? -0.5 : -0.02));
+                double z = player.getZ() + (player.input.pressingForward ? look.z * speed * 3 : 0);
+
+                // Шлем ПРОВЕРКУ коллизии (сбиваем античит)
+                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y - 0.01, z, false));
+                
+                // Основной пакет движения
                 player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(x, y, z, player.getYaw(), player.getPitch(), false));
+                
+                player.setPosition(x, y, z);
             }
-            
-            player.setPosition(x, y, z);
+
+            // Отменяем стандартный тик, чтобы не было rubberbanding от клиента
             ci.cancel();
         }
     }
 }
+
 
 
 
