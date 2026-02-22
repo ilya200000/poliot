@@ -15,32 +15,38 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Полная защита от вылетов на 1.20.1
         if (player == null || player.getWorld() == null || player.networkHandler == null) return;
 
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
             
-            // СКОРОСТЬ 0.11 - предел для BedWars Mystery. Выше - откинет назад.
-            double speed = 0.11; 
+            // СКОРОСТЬ 0.12 - оптимально для BedWars Mystery.
+            double speed = 0.12; 
 
+            // 1. ДВИЖЕНИЕ ВПЕРЕД (W)
             if (player.input.pressingForward) {
-                // ОБХОД ПРИТЯЖЕНИЯ (Grim Bypass)
-                // Каждые 2 тика шлем серверу пакет: "я здесь и я легально падаю"
-                if (player.age % 2 == 0) {
-                    double nextX = player.getX() + look.x * speed;
-                    double nextY = player.getY() + (look.y * speed) - 0.035; // Имитация падения (Y вниз)
-                    double nextZ = player.getZ() + look.z * speed;
+                // Если жмем Прыжок (Пробел) - летим ВВЕРХ
+                double yBoost = player.input.jumping ? 0.08 : (look.y * speed) - 0.01;
+                
+                double nextX = player.getX() + look.x * speed;
+                double nextY = player.getY() + yBoost;
+                double nextZ = player.getZ() + look.z * speed;
 
-                    // Для 1.20.1: конструктор принимает 4 аргумента (x, y, z, onGround)
+                // Каждые 2 тика шлем пакет позиции
+                if (player.age % 2 == 0) {
                     player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(nextX, nextY, nextZ, false));
                     player.setPosition(nextX, nextY, nextZ);
                 }
             }
 
-            // Плавное визуальное снижение
+            // 2. ФИКС ГРАВИТАЦИИ
+            // Чтобы не тянуло к полу, немного компенсируем падение, но не до нуля
             Vec3d v = player.getVelocity();
-            player.setVelocity(v.x, -0.015, v.z);
+            if (!player.input.jumping) {
+                player.setVelocity(v.x, -0.01, v.z);
+            } else {
+                player.setVelocity(v.x, 0.05, v.z);
+            }
             
             player.onLanding(); // Сброс урона
         }
