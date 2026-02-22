@@ -10,54 +10,54 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
     
-    @Inject(method = "tick", at = @At("TAIL"))
+    @Inject(method = "tick", at = @At("HEAD")) // Используем HEAD для стабильности
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         
-        // Проверка на мир и сессию (чтобы не вылетало при загрузке с Architectury)
-        if (player == null || player.clientWorld == null || player.networkHandler == null) return;
+        // Базовая проверка, чтобы не крашнуло в меню
+        if (player == null || player.getAbilities() == null) return;
 
-        // 1. АВТО-ВЗЛЕТ (Если падаем, пытаемся раскрыть элитры)
-        if (!player.isOnGround() && player.getVelocity().y < -0.2 && !player.isFallFlying()) {
+        // 1. АВТО-ВЗЛЕТ (Если падаем без элитр)
+        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
+        // 2. ЛОГИКА ПОЛЕТА
         if (player.isFallFlying()) {
             Vec3d look = player.getRotationVec(1.0F);
             Vec3d v = player.getVelocity();
 
-            // НАСТРОЙКИ ДЛЯ MYSTERYWORLD (Grim Anticheat)
-            double speed = 0.06; // Безопасное ускорение
-            double limit = 0.55; // Максимальная горизонтальная скорость
+            // Безопасная скорость для MysteryWorld
+            double speed = 0.05; 
 
-            // 2. ГОРИЗОНТАЛЬНОЕ УСКОРЕНИЕ (Плавное "подталкивание")
-            if (v.horizontalLength() < limit) {
-                player.addVelocity(look.x * speed, 0, look.z * speed);
-            }
+            // Движение вперед (добавляем к текущему вектору)
+            double mx = look.x * speed;
+            double mz = look.z * speed;
+            double my = 0;
 
-            // 3. УПРАВЛЕНИЕ ВЕРТИКАЛЬЮ (Bypass: имитируем ванильное падение)
+            // Управление высотой через ванильные кнопки
             if (player.input.jumping) {
-                // Плавный подъем (на пробел)
-                player.addVelocity(0, 0.05, 0);
+                my = 0.03; // Вверх
             } else if (player.input.sneaking) {
-                // Быстрый спуск (на Shift)
-                player.addVelocity(0, -0.15, 0);
+                my = -0.15; // Вниз
             } else {
-                // ГЛИЙД-РЕЖИМ: фиксируем падение на грани фола (-0.01)
-                // Это позволяет лететь прямо очень долго без флагов Grim
+                // Глайд-режим (анти-гравитация)
                 if (v.y < -0.01) {
-                    player.setVelocity(v.x, -0.01, v.z);
+                    my = 0.008; // Чуть подталкиваем вверх, чтобы падение было -0.01
                 }
             }
 
-            // 4. ЗАЩИТА ОТ КРАША И УРОНА
-            // Просто обнуляем дистанцию падения, чтобы Architectury не считал урон
-            if (player.fallDistance > 1.0F) {
+            // Устанавливаем скорость напрямую через поля (самый стабильный способ)
+            player.addVelocity(mx, my, mz);
+
+            // 3. ФИКС УРОНА (Чтобы не разбиться при посадке)
+            if (player.fallDistance > 1.0f) {
                 player.fallDistance = 0;
             }
         }
     }
 }
+
 
 
 
