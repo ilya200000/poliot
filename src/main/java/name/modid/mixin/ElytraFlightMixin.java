@@ -2,7 +2,6 @@ package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,53 +11,47 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
 
-    @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         if (player == null || player.networkHandler == null) return;
 
-        // 1. ПРИНУДИТЕЛЬНЫЙ ВЗЛЕТ
-        if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
+        // 1. АВТОВЗЛЕТ
+        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
         }
 
         if (player.isFallFlying()) {
-            // ОСТАНАВЛИВАЕМ КЛИЕНТСКУЮ ФИЗИКУ (чтобы не было десинхрона и дерганий)
-            player.setVelocity(0, 0, 0);
-
-            // 2. РАСЧЕТ ДВИЖЕНИЯ
-            // 0.25 — это предел. Если кикает, ставь 0.18
-            double speed = 0.12; 
+            Vec3d v = player.getVelocity();
             Vec3d look = player.getRotationVec(1.0F);
-            
-            double x = player.getX();
-            double y = player.getY();
-            double z = player.getZ();
 
+            // 2. ПОДДЕРЖКА СКОРОСТИ (W)
+            // Мы не СТАВИМ скорость, а УМНОЖАЕМ текущую. 
+            // 1.01 — это микро-буст, который Grim списывает на погрешность вычислений.
             if (player.input.pressingForward) {
-                x += look.x * speed;
-                z += look.z * speed;
-                y += look.y * speed;
+                double speed = Math.sqrt(v.x * v.x + v.z * v.z);
+                if (speed < 0.5) { // 0.5 — безопасный порог
+                    player.setVelocity(v.x * 1.01, v.y, v.z * 1.01);
+                }
             }
-            
-            if (player.input.jumping) y += 0.15;
-            if (player.input.sneaking) y -= 0.15;
 
-            // 3. БАЙПАС "GRIM": Шлем микро-пакет "падения" перед основным перемещением
-            // Это обманывает проверку на полет, сервер думает, что ты падаешь
-            player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(player.getX(), player.getY() - 0.005, player.getZ(), false));
+            // 3. БАЙПАС ГРАВИТАЦИИ (Глайд)
+            // Мы "подтягиваем" игрока вверх только если он реально падает.
+            // -0.05 — это легитное падение. -0.01 часто палится.
+            if (!player.input.jumping && !player.input.sneaking) {
+                if (v.y < -0.05) {
+                    player.setVelocity(v.x, -0.05, v.z);
+                }
+            }
 
-            // Основной пакет перемещения
-            player.networkHandler.sendPacket(new PlayerMoveC2SPacket.Full(x, y, z, player.getYaw(), player.getPitch(), false));
-
-            // Ставим игрока в новую точку визуально
-            player.setPosition(x, y, z);
-
-            // 4. ОТМЕНЯЕМ ВАНИЛЬНЫЙ ТИК (чтобы игра не тянула тебя вниз сама)
-            ci.cancel();
+            // 4. ПОДЪЕМ (Только Пробел)
+            if (player.input.jumping) {
+                player.addVelocity(0, 0.04, 0);
+            }
         }
     }
 }
+
 
 
 
