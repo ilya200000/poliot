@@ -14,11 +14,11 @@ public abstract class ElytraFlightMixin {
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // 1. ПРОВЕРКА (чтобы не лагало при заходе)
-        if (player == null || player.isSpectator()) return;
+        // 1. Безопасная проверка при заходе в мир
+        if (player == null || player.isSpectator() || player.getAbilities().flying) return;
 
-        // 2. АВТОВЗЛЕТ (Легитный способ через ванильный метод)
-        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
+        // 2. Легитный взлет (через проверку возможности полета)
+        if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
@@ -26,33 +26,43 @@ public abstract class ElytraFlightMixin {
             Vec3d look = player.getRotationVec(1.0F);
             Vec3d velocity = player.getVelocity();
 
-            // 3. СКОРОСТЬ (0.35 — это очень стабильно и быстро)
-            double speed = 0.35;
+            // 3. СКОРОСТЬ (0.18 — это предел, который Grim считает "легальным планированием")
+            // Если на твоем сервере всё равно откатывает — снизь до 0.12
+            double speed = 0.18;
 
             // Движение вперед (W)
             if (player.input.pressingForward) {
-                // Мы просто "подменяем" текущую скорость на скорость по взгляду
-                // БЕЗ ручной отправки пакетов (клиент сам их отправит в конце тика)
-                player.setVelocity(look.x * speed, velocity.y, look.z * speed);
+                // Мы используем addVelocity, а не setVelocity. 
+                // Это создает плавный импульс, который сервер принимает за пинг/ветер.
+                double xBoost = (look.x * speed - velocity.x) * 0.2;
+                double zBoost = (look.z * speed - velocity.z) * 0.2;
+                player.addVelocity(xBoost, 0, zBoost);
             }
 
-            // 4. УПРАВЛЕНИЕ ВЫСОТОЙ
+            // 4. УПРАВЛЕНИЕ ВЫСОТОЙ (Space / Shift)
             if (player.input.jumping) {
-                // Плавный подъем
-                player.addVelocity(0, 0.05, 0);
+                // Поднимаем по чуть-чуть, чтобы не сработал чек на Fly
+                player.addVelocity(0, 0.04, 0);
             } else if (player.input.sneaking) {
-                // Быстрый спуск
-                player.setVelocity(velocity.x, -0.5, velocity.z);
+                player.addVelocity(0, -0.2, 0);
             } else {
-                // БАЙПАС ПАДЕНИЯ (Hover)
-                // -0.01 — магическое число, падение почти незаметно
-                if (player.getVelocity().y < -0.01) {
-                    player.setVelocity(player.getVelocity().x, -0.01, player.getVelocity().z);
+                // ПЛАВНЫЙ ГЛАЙД (Hover)
+                // Если падаем слишком быстро, мягко тормозим падение до -0.05.
+                // -0.05 — это абсолютно легитимная вертикальная скорость элитры.
+                if (velocity.y < -0.05) {
+                    player.addVelocity(0, 0.035, 0);
                 }
+            }
+            
+            // 5. ФИКС ТРЕНИЯ
+            // Не даем персонажу полностью остановиться в воздухе
+            if (velocity.horizontalLength() < 0.1 && player.input.pressingForward) {
+                player.addVelocity(look.x * 0.1, 0, look.z * 0.1);
             }
         }
     }
 }
+
 
 
 
