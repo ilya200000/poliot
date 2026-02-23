@@ -21,13 +21,13 @@ public abstract class PoliotMixin {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
 
-        if (config.totem.enabled && player.getOffHandStack().getItem() != Items.TOTEM_OF_UNDYING) {
+        if (config.totemEnabled && player.getOffHandStack().getItem() != Items.TOTEM_OF_UNDYING) {
             if (totemTimer <= 0) {
                 for (int i = 9; i <= 44; i++) {
                     if (player.getInventory().getStack(i == 44 ? 40 : i).getItem() == Items.TOTEM_OF_UNDYING) {
                         int slot = i == 44 ? 45 : i;
                         MinecraftClient.getInstance().interactionManager.clickSlot(player.currentScreenHandler.syncId, slot, 40, SlotActionType.SWAP, player);
-                        totemTimer = config.totem.delay / 50; 
+                        totemTimer = config.totemDelay / 50; 
                         break;
                     }
                 }
@@ -42,11 +42,14 @@ abstract class ShopMixin {
     @Inject(method = "render", at = @At("HEAD"))
     private void onShopRender(CallbackInfo ci) {
         ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
-        if (!config.shop.enabled) return;
+        if (!config.shopEnabled) return;
 
-        GenericContainerScreen<?> screen = (GenericContainerScreen<?>) (Object) this;
-        if (screen.getTitle().getString().contains(config.shop.title)) {
-            MinecraftClient.getInstance().interactionManager.clickSlot(screen.getScreenHandler().syncId, config.shop.slot, 0, SlotActionType.QUICK_MOVE, MinecraftClient.getInstance().player);
+        GenericContainerScreen screen = (GenericContainerScreen) (Object) this;
+        if (screen.getTitle().getString().contains(config.shopTitle)) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client.interactionManager != null && client.player != null) {
+                client.interactionManager.clickSlot(screen.getScreenHandler().syncId, config.shopSlot, 0, SlotActionType.QUICK_MOVE, client.player);
+            }
         }
     }
 }
