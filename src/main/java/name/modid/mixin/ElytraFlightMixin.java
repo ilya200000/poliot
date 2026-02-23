@@ -3,7 +3,6 @@ package name.modid.mixin;
 import name.modid.ElytraData;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,6 +19,7 @@ public abstract class ElytraFlightMixin {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         if (player == null || player.networkHandler == null) return;
 
+        // Авто-взлет (через ванильный метод для легитности)
         if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
@@ -28,27 +28,37 @@ public abstract class ElytraFlightMixin {
             ElytraData.isFlying = true;
             tickCounter++;
 
-            double speed = 0.25; // Профессиональная скорость для Grim
+            // СКОРОСТЬ (0.22 — база для обхода Grim)
+            double speed = 0.22; 
             Vec3d look = player.getRotationVec(1.0F);
 
-            // Имитируем движение на клиенте
+            // 1. ДВИЖЕНИЕ НА КЛИЕНТЕ (Чтобы не было дерганий экрана)
             if (player.input.pressingForward) {
                 player.setPos(player.getX() + look.x * speed, player.getY() + look.y * speed, player.getZ() + look.z * speed);
             }
             if (player.input.jumping) player.setPos(player.getX(), player.getY() + 0.1, player.getZ());
+            
+            // Фиксируем скорость клиента в 0, чтобы ванильная физика не мешала "блинку"
+            player.setVelocity(0, 0, 0);
 
-            // Каждые 3 тика "выстреливаем" накопленные пакеты
+            // 2. ВЫСТРЕЛ ПАКЕТАМИ (Blink Bypass)
+            // Каждые 3 тика отправляем всё, что накопил NetworkMixin
             if (tickCounter % 3 == 0) {
                 while (!ElytraData.packetQueue.isEmpty()) {
                     Packet<?> p = ElytraData.packetQueue.poll();
-                    if (p != null) player.networkHandler.getPacketBundleHandler(); // Заглушка для конвейера
-                    player.networkHandler.sendPacket(p);
+                    if (p != null) {
+                        // Шлем пакет напрямую без лишних проверок
+                        player.networkHandler.getConnection().send(p);
+                    }
                 }
             }
         } else {
             ElytraData.isFlying = false;
-            // Очистка очереди при приземлении
-            ElytraData.packetQueue.clear();
+            // Чистим очередь, если упали или приземлились
+            if (!ElytraData.packetQueue.isEmpty()) {
+                ElytraData.packetQueue.clear();
+            }
         }
     }
 }
+
