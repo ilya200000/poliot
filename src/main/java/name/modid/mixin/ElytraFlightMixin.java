@@ -1,8 +1,7 @@
 package name.modid.mixin;
 
-import name.modid.ElytraData;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -12,53 +11,44 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ClientPlayerEntity.class)
 public abstract class ElytraFlightMixin {
 
-    private int tickCounter = 0;
-
-    @Inject(method = "tick", at = @At("HEAD"))
+    @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         if (player == null || player.networkHandler == null) return;
 
-        // Авто-взлет (через ванильный метод для легитности)
-        if (!player.isOnGround() && player.getVelocity().y < -0.05 && !player.isFallFlying()) {
+        // 1. АВТОВЗЛЕТ
+        if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
             player.checkFallFlying();
         }
 
         if (player.isFallFlying()) {
-            ElytraData.isFlying = true;
-            tickCounter++;
-
-            // СКОРОСТЬ (0.22 — база для обхода Grim)
-            double speed = 0.22; 
+            Vec3d v = player.getVelocity();
             Vec3d look = player.getRotationVec(1.0F);
 
-            // 1. ДВИЖЕНИЕ НА КЛИЕНТЕ (Чтобы не было дерганий экрана)
+            // 2. БЕЗОПАСНЫЙ БУСТ (W)
+            // Мы не СТАВИМ скорость, мы ее СОХРАНЯЕМ.
+            // 0.42 - это ванильная скорость планирования. Если ее держать - это не чит.
             if (player.input.pressingForward) {
-                player.setPos(player.getX() + look.x * speed, player.getY() + look.y * speed, player.getZ() + look.z * speed);
-            }
-            if (player.input.jumping) player.setPos(player.getX(), player.getY() + 0.1, player.getZ());
-            
-            // Фиксируем скорость клиента в 0, чтобы ванильная физика не мешала "блинку"
-            player.setVelocity(0, 0, 0);
-
-            // 2. ВЫСТРЕЛ ПАКЕТАМИ (Blink Bypass)
-            // Каждые 3 тика отправляем всё, что накопил NetworkMixin
-            if (tickCounter % 3 == 0) {
-                while (!ElytraData.packetQueue.isEmpty()) {
-                    Packet<?> p = ElytraData.packetQueue.poll();
-                    if (p != null) {
-                        // Шлем пакет напрямую без лишних проверок
-                        player.networkHandler.getConnection().send(p);
-                    }
+                double currentSpeed = Math.sqrt(v.x * v.x + v.z * v.z);
+                if (currentSpeed < 0.42) {
+                    player.addVelocity(look.x * 0.02, 0, look.z * 0.02);
                 }
             }
-        } else {
-            ElytraData.isFlying = false;
-            // Чистим очередь, если упали или приземлились
-            if (!ElytraData.packetQueue.isEmpty()) {
-                ElytraData.packetQueue.clear();
+
+            // 3. БАЙПАС ПАДЕНИЯ (Глайд)
+            // Вместо -0.01 (дрисня, которую палят), ставим -0.04. 
+            // Это 1 блок падения за 5 секунд. Почти бесконечно.
+            if (!player.input.jumping && !player.input.sneaking) {
+                if (v.y < -0.04) {
+                    // Мягко подталкиваем вверх, чтобы не падать быстро
+                    player.addVelocity(0, 0.035, 0);
+                }
+            }
+
+            // 4. ПОДЪЕМ (Space)
+            if (player.input.jumping) {
+                player.addVelocity(0, 0.04, 0);
             }
         }
     }
 }
-
