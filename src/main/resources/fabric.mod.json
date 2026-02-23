@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "name": "Poliot Hack",
   "entrypoints": {
-    "client": [
+    "modmenu": [
       "name.modid.ModMenuImpl"
     ]
   },
