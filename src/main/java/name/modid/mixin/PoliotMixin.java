@@ -7,7 +7,6 @@ import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.Items;
 import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.util.Hand;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -22,14 +21,13 @@ public abstract class PoliotMixin {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
         ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
 
-        // --- AUTO TOTEM ---
-        if (config.totemEnabled && player.getOffHandStack().getItem() != Items.TOTEM_OF_UNDYING) {
+        if (config.totem.enabled && player.getOffHandStack().getItem() != Items.TOTEM_OF_UNDYING) {
             if (totemTimer <= 0) {
-                for (int i = 9; i < 45; i++) { // Ищем тотем в инвентаре
+                for (int i = 9; i <= 44; i++) {
                     if (player.getInventory().getStack(i == 44 ? 40 : i).getItem() == Items.TOTEM_OF_UNDYING) {
-                        int slot = i == 44 ? 45 : i; // Магия слотов Fabric
+                        int slot = i == 44 ? 45 : i;
                         MinecraftClient.getInstance().interactionManager.clickSlot(player.currentScreenHandler.syncId, slot, 40, SlotActionType.SWAP, player);
-                        totemTimer = config.totemDelay / 50; // Конвертим мс в тики
+                        totemTimer = config.totem.delay / 50; 
                         break;
                     }
                 }
@@ -42,15 +40,13 @@ public abstract class PoliotMixin {
 @Mixin(GenericContainerScreen.class)
 abstract class ShopMixin {
     @Inject(method = "render", at = @At("HEAD"))
-    private void onShopOpen(CallbackInfo ci) {
+    private void onShopRender(CallbackInfo ci) {
         ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
-        if (!config.autoBuyEnabled) return;
+        if (!config.shop.enabled) return;
 
-        GenericContainerScreen screen = (GenericContainerScreen) (Object) this;
-        if (screen.getTitle().getString().contains(config.shopTitle)) {
-            MinecraftClient client = MinecraftClient.getInstance();
-            client.interactionManager.clickSlot(screen.getScreenHandler().syncId, config.shopSlot, 0, SlotActionType.QUICK_MOVE, client.player);
-            // client.player.closeHandledScreen(); // Раскомментируй, если хочешь авто-закрытие
+        GenericContainerScreen<?> screen = (GenericContainerScreen<?>) (Object) this;
+        if (screen.getTitle().getString().contains(config.shop.title)) {
+            MinecraftClient.getInstance().interactionManager.clickSlot(screen.getScreenHandler().syncId, config.shop.slot, 0, SlotActionType.QUICK_MOVE, MinecraftClient.getInstance().player);
         }
     }
 }
