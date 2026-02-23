@@ -9,8 +9,10 @@ public class ModMenuImpl implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
         try {
+            // Регистрируем конфиг только один раз
             AutoConfig.register(ModConfig.class, GsonConfigSerializer::new);
         } catch (Exception ignored) {}
+        
         return parent -> AutoConfig.getConfigScreen(ModConfig.class, parent).get();
     }
 }
