@@ -1,7 +1,7 @@
 package name.modid.mixin;
 
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -13,38 +13,47 @@ public abstract class ElytraFlightMixin {
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        if (player == null || player.networkHandler == null) return;
 
-        // 1. АВТОВЗЛЕТ
+        // 1. ПРОВЕРКА (чтобы не лагало при заходе)
+        if (player == null || player.isSpectator()) return;
+
+        // 2. АВТОВЗЛЕТ (Легитный способ через ванильный метод)
         if (!player.isOnGround() && player.getVelocity().y < -0.1 && !player.isFallFlying()) {
-            player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
+            player.checkFallFlying();
         }
 
         if (player.isFallFlying()) {
-            // 2. БАЙПАС "PITCH-HOP"
-            // Мы не трогаем скорость! Мы заставляем сервер думать, что ты постоянно 
-            // "перезапускаешь" полет. Это убирает трение воздуха в 1.20.1.
-            if (player.input.pressingForward) {
-                if (player.age % 10 == 0) {
-                    // Переоткрываем элитру без закрытия (серверный глитч)
-                    player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
-                }
+            Vec3d look = player.getRotationVec(1.0F);
+            Vec3d velocity = player.getVelocity();
 
-                // 3. ЛЕГИТНОЕ ПЛАНИРОВАНИЕ
-                // Мы просто ставим взгляд чуть-чуть вверх (-2.0), чтобы не падать быстро.
-                // Это не чит, это "зажатый макрос" на угол взгляда.
-                if (player.getPitch() > -2.0F && !player.input.jumping) {
-                    player.setPitch(-2.0F);
-                }
+            // 3. СКОРОСТЬ (0.35 — это очень стабильно и быстро)
+            double speed = 0.35;
+
+            // Движение вперед (W)
+            if (player.input.pressingForward) {
+                // Мы просто "подменяем" текущую скорость на скорость по взгляду
+                // БЕЗ ручной отправки пакетов (клиент сам их отправит в конце тика)
+                player.setVelocity(look.x * speed, velocity.y, look.z * speed);
             }
-            
-            // Если зажат прыжок — мод плавно тянет нос вверх для набора высоты
+
+            // 4. УПРАВЛЕНИЕ ВЫСОТОЙ
             if (player.input.jumping) {
-                player.setPitch(-15.0F);
+                // Плавный подъем
+                player.addVelocity(0, 0.05, 0);
+            } else if (player.input.sneaking) {
+                // Быстрый спуск
+                player.setVelocity(velocity.x, -0.5, velocity.z);
+            } else {
+                // БАЙПАС ПАДЕНИЯ (Hover)
+                // -0.01 — магическое число, падение почти незаметно
+                if (player.getVelocity().y < -0.01) {
+                    player.setVelocity(player.getVelocity().x, -0.01, player.getVelocity().z);
+                }
             }
         }
     }
 }
+
 
 
 
