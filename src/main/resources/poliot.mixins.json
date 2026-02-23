@@ -4,15 +4,9 @@
   "package": "name.modid.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "ElytraFlightMixin",
-    "NetworkMixin"
-  ],
-  "client": [
+    "ElytraFlightMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   }
 }
-
-
-
