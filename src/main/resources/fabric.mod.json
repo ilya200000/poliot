@@ -2,15 +2,11 @@
   "schemaVersion": 1,
   "id": "poliot",
   "version": "1.0.0",
-  "name": "Poliot",
-  "description": "Elytra Flight for MysteryWorld",
-  "authors": ["YourName"],
-  "contact": {},
-  "license": "MIT",
-  "icon": "assets/poliot/icon.png",
-  "environment": "client",
+  "name": "Poliot Hack",
   "entrypoints": {
-    "main": []
+    "client": [
+      "name.modid.ModMenuImpl"
+    ]
   },
   "mixins": [
     "poliot.mixins.json"
@@ -18,10 +14,7 @@
   "depends": {
     "fabricloader": ">=0.14.22",
     "minecraft": "1.20.1",
-    "java": ">=17"
+    "modmenu": "*",
+    "cloth-config2": "*"
   }
 }
-
-
-
-
