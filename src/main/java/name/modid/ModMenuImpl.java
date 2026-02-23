@@ -8,11 +8,9 @@ import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 public class ModMenuImpl implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        // Регистрируем конфиг (оборачиваем в try-catch на всякий случай)
         try {
             AutoConfig.register(ModConfig.class, GsonConfigSerializer::new);
         } catch (Exception ignored) {}
-        
         return parent -> AutoConfig.getConfigScreen(ModConfig.class, parent).get();
     }
 }
