@@ -12,28 +12,27 @@ public abstract class ElytraFlightMixin {
 
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
-        // Получаем объект игрока
+        // Кастуем текущий объект в игрока
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Проверяем, раскрыты ли элитры
+        // Проверяем, активированы ли элитры (режим планирования)
         if (player.isFallFlying()) {
-            // УМЕНЬШЕННАЯ СКОРОСТЬ (была ~0.7, теперь 0.15)
-            double speed = 0.15;
+            // МИНИМАЛЬНАЯ СКОРОСТЬ (0.12) — чтобы Grim не дергал камеру
+            double speed = 0.12; 
             
-            // Получаем вектор направления взгляда
+            // В 1.21.1 направление взгляда берется через getRotationVector
             Vec3d look = player.getRotationVector();
             
-            // Если зажата кнопка движения вперед (W)
+            // Если зажата клавиша вперед (W)
             if (player.input.pressingForward) {
-                // Умножаем направление на скорость
-                double vX = look.x * speed;
-                double vY = look.y * speed;
-                double vZ = look.z * speed;
-                
-                // Устанавливаем новую скорость игроку (метод setVelocity)
-                player.setVelocity(vX, vY, vZ);
+                // Применяем вектор скорости по направлению прицела
+                player.setVelocity(
+                    look.x * speed, 
+                    look.y * speed, 
+                    look.z * speed
+                );
             } else {
-                // Если W не нажата — медленное планирование вниз (чтобы не кикнул Grim)
+                // Имитируем естественное падение, чтобы сервер не заподозрил зависание
                 player.setVelocity(0, -0.01, 0);
             }
         }
