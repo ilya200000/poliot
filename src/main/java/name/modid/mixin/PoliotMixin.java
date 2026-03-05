@@ -9,37 +9,39 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPlayerEntity.class)
-public class ElytraFlyMixin {
+public abstract class PoliotMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
-    private void onGrimTick(CallbackInfo ci) {
+    private void onElytraFlyTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
+        // Работает только если элитры уже раскрыты (Fall Flying)
         if (player.isFallFlying()) {
-            // Grim очень чувствителен к оси Y. 
-            // Обнуляем вертикальное падение, но оставляем микро-движение вниз (0.005)
-            Vec3d vel = player.getVelocity();
-            double ySpeed = 0;
-
-            if (player.input.jumping) ySpeed = 0.05; // Медленный подъем
-            else if (player.input.sneaking) ySpeed = -0.05;
-            else ySpeed = -0.005; // Имитация гравитации для Grim
-
-            // Получаем вектор направления взгляда для горизонтального полета
             Vec3d look = player.getRotationVector();
-            double speed = 0.15; // Безопасная скорость для Grim. Выше 0.25 — риск кика.
+            double speed = 0.15; // Максимально безопасная скорость для Grim
+            double ySpeed;
 
+            // Управление вертикалью (Пробел - вверх, Шифт - вниз)
+            if (player.input.jumping) {
+                ySpeed = 0.05;
+            } else if (player.input.sneaking) {
+                ySpeed = -0.05;
+            } else {
+                // Константное микро-падение, чтобы Grim не флагнул за "зависание"
+                ySpeed = -0.005;
+            }
+
+            // Движение вперед (клавиша W)
             if (player.input.pressingForward) {
-                // Устанавливаем плавную скорость
                 player.setVelocity(look.x * speed, ySpeed, look.z * speed);
             } else {
+                // Если W не зажата, просто плавно опускаемся
                 player.setVelocity(0, ySpeed, 0);
             }
 
-            // ПАКЕТНЫЙ ХАК ДЛЯ GRIM:
-            // Каждые 2 тика отправляем серверу пакет, что мы "снова" начали лететь.
-            // Это сбивает проверки на ускорение (Prediction) у Grim.
-            if (player.age % 2 == 0) {
+            // ГЛАВНЫЙ ОБХОД: Каждые 2 тика шлем пакет "Начал полет на элитрах"
+            // Это сбивает предикцию античита и позволяет лететь горизонтально
+            if (player.age % 2 == 0 && player.networkHandler != null) {
                 player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
             }
         }
