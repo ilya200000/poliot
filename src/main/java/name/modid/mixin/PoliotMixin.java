@@ -1,54 +1,46 @@
 package name.modid.mixin;
 
-import name.modid.ModConfig;
-import me.shedaniel.autoconfig.AutoConfig;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.item.Items;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPlayerEntity.class)
-public abstract class PoliotMixin {
-    private int totemTimer = 0;
+public class ElytraFlyMixin {
 
-    @Inject(method = "tick", at = @At("TAIL"))
-    private void onTick(CallbackInfo ci) {
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void onGrimTick(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
-        ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
 
-        if (config.totemEnabled && player.getOffHandStack().getItem() != Items.TOTEM_OF_UNDYING) {
-            if (totemTimer <= 0) {
-                for (int i = 9; i <= 44; i++) {
-                    if (player.getInventory().getStack(i == 44 ? 40 : i).getItem() == Items.TOTEM_OF_UNDYING) {
-                        int slot = i == 44 ? 45 : i;
-                        MinecraftClient.getInstance().interactionManager.clickSlot(player.currentScreenHandler.syncId, slot, 40, SlotActionType.SWAP, player);
-                        totemTimer = config.totemDelay / 50; 
-                        break;
-                    }
-                }
+        if (player.isFallFlying()) {
+            // Grim очень чувствителен к оси Y. 
+            // Обнуляем вертикальное падение, но оставляем микро-движение вниз (0.005)
+            Vec3d vel = player.getVelocity();
+            double ySpeed = 0;
+
+            if (player.input.jumping) ySpeed = 0.05; // Медленный подъем
+            else if (player.input.sneaking) ySpeed = -0.05;
+            else ySpeed = -0.005; // Имитация гравитации для Grim
+
+            // Получаем вектор направления взгляда для горизонтального полета
+            Vec3d look = player.getRotationVector();
+            double speed = 0.15; // Безопасная скорость для Grim. Выше 0.25 — риск кика.
+
+            if (player.input.pressingForward) {
+                // Устанавливаем плавную скорость
+                player.setVelocity(look.x * speed, ySpeed, look.z * speed);
+            } else {
+                player.setVelocity(0, ySpeed, 0);
             }
-        }
-        if (totemTimer > 0) totemTimer--;
-    }
-}
 
-@Mixin(GenericContainerScreen.class)
-abstract class ShopMixin {
-    @Inject(method = "render", at = @At("HEAD"))
-    private void onShopRender(CallbackInfo ci) {
-        ModConfig config = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
-        if (!config.shopEnabled) return;
-
-        GenericContainerScreen screen = (GenericContainerScreen) (Object) this;
-        if (screen.getTitle().getString().contains(config.shopTitle)) {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.interactionManager != null && client.player != null) {
-                client.interactionManager.clickSlot(screen.getScreenHandler().syncId, config.shopSlot, 0, SlotActionType.QUICK_MOVE, client.player);
+            // ПАКЕТНЫЙ ХАК ДЛЯ GRIM:
+            // Каждые 2 тика отправляем серверу пакет, что мы "снова" начали лететь.
+            // Это сбивает проверки на ускорение (Prediction) у Grim.
+            if (player.age % 2 == 0) {
+                player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
             }
         }
     }
