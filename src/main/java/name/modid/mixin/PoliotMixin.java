@@ -13,42 +13,48 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class PoliotMixin {
 
     @Inject(method = "tick", at = @At("HEAD"))
-    private void onGrimFly(CallbackInfo ci) {
+    private void onUniversalFly(CallbackInfo ci) {
         ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // Чит сработает ТОЛЬКО когда ты нажал пробел в воздухе и элитры раскрылись
+        // Чит активируется ТОЛЬКО когда элитры раскрыты (прыжок + пробел в воздухе)
         if (player.isFallFlying()) {
-            // Отключаем стандартную гравитацию клиента, чтобы не тянуло вниз
+            // 1. Полностью отключаем ванильную гравитацию и инерцию
             player.setVelocity(0, 0, 0);
 
-            double speed = 0.4; // Скорость перемещения пакетами
+            // 2. Настройки скорости (0.5 - очень быстро для обычного мира)
+            double speed = 0.5;
             Vec3d look = player.getRotationVector();
             
-            double x = player.getX();
-            double y = player.getY();
-            double z = player.getZ();
+            double nextX = player.getX();
+            double nextY = player.getY();
+            double nextZ = player.getZ();
 
-            // Рассчитываем новую позицию на основе клавиш управления
+            // 3. Логика движения по направлению взгляда
             if (player.input.pressingForward) {
-                x += look.x * speed;
-                z += look.z * speed;
-                y += look.y * speed; // Летит туда, куда смотришь
+                nextX += look.x * speed;
+                nextY += look.y * speed;
+                nextZ += look.z * speed;
             }
-            
-            if (player.input.jumping) y += 0.2;
-            if (player.input.sneaking) y -= 0.2;
+            if (player.input.pressingBack) {
+                nextX -= look.x * speed;
+                nextY -= look.y * speed;
+                nextZ -= look.z * speed;
+            }
 
-            // ГЛАВНЫЙ ХАК: Шлем серверу пакет, что мы УЖЕ передвинулись
-            // Grim видит это как легитимное планирование на элитрах
+            // Ручное управление высотой (Пробел/Шифт)
+            if (player.input.jumping) nextY += 0.3;
+            if (player.input.sneaking) nextY -= 0.3;
+
+            // 4. ПЕРЕМЕЩЕНИЕ (Самая важная часть)
+            // Устанавливаем позицию клиенту
+            player.setPosition(nextX, nextY, nextZ);
+
+            // Отправляем пакет серверу, что мы ТУТ. false = мы не на земле.
             if (player.networkHandler != null) {
-                // Отправляем позицию напрямую в обход методов движения
-                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, false));
+                player.networkHandler.sendPacket(new PlayerMoveC2SPacket.PositionAndOnGround(nextX, nextY, nextZ, false));
                 
-                // Телепортируем визуальную модель игрока в ту же точку
-                player.setPosition(x, y, z);
-                
-                // Каждые 2 тика "перезагружаем" состояние полета для сервера
-                if (player.age % 2 == 0) {
+                // Каждые 5 тиков спамим пакет взлета, чтобы сервер не "забыл", что мы летим
+                if (player.age % 5 == 0) {
                     player.networkHandler.sendPacket(new ClientCommandC2SPacket(player, ClientCommandC2SPacket.Mode.START_FALL_FLYING));
                 }
             }
